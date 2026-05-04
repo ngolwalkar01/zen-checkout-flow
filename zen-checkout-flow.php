@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Zen Checkout Flow
  * Description: Popup-based WooCommerce checkout/cart flow for logged-in customers.
- * Version: 0.1.0
+ * Version: 0.1.1
  * Author: Custom
  * Text Domain: zen-checkout-flow
  *
@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
 if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 	final class ZCF_Zen_Checkout_Flow {
 
-		const VERSION = '0.1.0';
+		const VERSION = '0.1.1';
 		const NONCE_ACTION = 'zcf_checkout_flow';
 
 		/**
@@ -31,6 +31,7 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			add_shortcode( 'zen_checkout_flow', array( __CLASS__, 'render_shortcode' ) );
 
 			add_action( 'wp_enqueue_scripts', array( __CLASS__, 'register_assets' ) );
+			add_action( 'wp_ajax_zcf_render_checkout', array( __CLASS__, 'ajax_render_checkout' ) );
 			add_action( 'wp_ajax_zcf_refresh_checkout', array( __CLASS__, 'ajax_refresh_checkout' ) );
 			add_action( 'wp_ajax_zcf_apply_coupon', array( __CLASS__, 'ajax_apply_coupon' ) );
 			add_action( 'wp_ajax_zcf_remove_coupon', array( __CLASS__, 'ajax_remove_coupon' ) );
@@ -64,7 +65,7 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 		}
 
 		/**
-		 * Register assets. They are enqueued only when shortcode renders.
+		 * Register and enqueue frontend assets.
 		 */
 		public static function register_assets() {
 			$base_url = plugin_dir_url( __FILE__ );
@@ -91,12 +92,22 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 					'ajaxUrl'     => admin_url( 'admin-ajax.php' ),
 					'nonce'       => wp_create_nonce( self::NONCE_ACTION ),
 					'checkoutUrl' => self::dependencies_loaded() ? wc_get_checkout_url() : '',
+					'checkoutAjaxUrl' => self::dependencies_loaded() && class_exists( 'WC_AJAX' ) ? WC_AJAX::get_endpoint( 'checkout' ) : '',
+					'checkoutNonce' => wp_create_nonce( 'woocommerce-process_checkout' ),
+					'myAccountUrl' => self::dependencies_loaded() ? wc_get_page_permalink( 'myaccount' ) : '',
+					'customer'    => self::get_checkout_customer_data(),
 					'i18n'        => array(
 						'loading' => __( 'Updating...', 'zen-checkout-flow' ),
 						'error'   => __( 'Something went wrong. Please try again.', 'zen-checkout-flow' ),
+						'processing' => __( 'Processing payment...', 'zen-checkout-flow' ),
 					),
 				)
 			);
+
+			if ( ! is_admin() && self::dependencies_loaded() ) {
+				wp_enqueue_style( 'zcf-checkout-flow' );
+				wp_enqueue_script( 'zcf-checkout-flow' );
+			}
 		}
 
 		/**
@@ -125,6 +136,34 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			?>
 			<div class="zcf-shell" data-zcf-checkout-flow>
 				<?php echo self::render_frame( $atts['title'] ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+			</div>
+			<?php
+			return ob_get_clean();
+		}
+
+		/**
+		 * Render checkout shell for theme modal injection.
+		 */
+		public static function ajax_render_checkout() {
+			self::verify_ajax();
+
+			wp_send_json_success(
+				array(
+					'html' => self::render_shell(),
+				)
+			);
+		}
+
+		/**
+		 * Render an embeddable checkout shell.
+		 *
+		 * @return string
+		 */
+		private static function render_shell() {
+			ob_start();
+			?>
+			<div class="zcf-shell" data-zcf-checkout-flow>
+				<?php echo self::render_frame( __( 'Buy now:', 'zen-checkout-flow' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 			</div>
 			<?php
 			return ob_get_clean();
@@ -184,11 +223,45 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 							);
 							?>
 						</button>
+						<div class="zcf-checkout-result" data-zcf-checkout-result aria-live="polite"></div>
 					</section>
 				</div>
 			</div>
 			<?php
 			return ob_get_clean();
+		}
+
+		/**
+		 * Get logged-in customer checkout defaults for AJAX checkout.
+		 *
+		 * @return array
+		 */
+		private static function get_checkout_customer_data() {
+			if ( ! self::dependencies_loaded() || ! is_user_logged_in() || ! WC()->customer ) {
+				return array();
+			}
+
+			$customer = WC()->customer;
+			$user     = wp_get_current_user();
+			$country  = $customer->get_billing_country();
+
+			if ( ! $country && WC()->countries ) {
+				$country = WC()->countries->get_base_country();
+			}
+
+			return array(
+				'billing_first_name' => $customer->get_billing_first_name() ? $customer->get_billing_first_name() : $user->first_name,
+				'billing_last_name'  => $customer->get_billing_last_name() ? $customer->get_billing_last_name() : $user->last_name,
+				'billing_company'    => $customer->get_billing_company(),
+				'billing_country'    => $country,
+				'billing_address_1'  => $customer->get_billing_address_1(),
+				'billing_address_2'  => $customer->get_billing_address_2(),
+				'billing_city'       => $customer->get_billing_city(),
+				'billing_state'      => $customer->get_billing_state(),
+				'billing_postcode'   => $customer->get_billing_postcode(),
+				'billing_phone'      => $customer->get_billing_phone(),
+				'billing_email'      => $customer->get_billing_email() ? $customer->get_billing_email() : $user->user_email,
+			);
 		}
 
 		/**

@@ -461,6 +461,39 @@
 	font-size: 16px;
 }
 
+.zcf-checkout-result,
+.zen-checkout-loading {
+	margin-top: 16px;
+	padding: 14px 18px;
+	border-radius: 10px;
+	font-size: 16px;
+	line-height: 1.45;
+}
+
+.zen-checkout-loading {
+	color: #f4f1e8;
+	background: rgba(38, 39, 34, 0.9);
+}
+
+.zcf-checkout-result:empty {
+	display: none;
+}
+
+.zcf-checkout-result.is-error {
+	background: rgba(160, 38, 38, 0.18);
+	color: #ffd8d8;
+}
+
+.zcf-checkout-result.is-success {
+	background: rgba(226, 190, 82, 0.14);
+	color: var(--zcf-gold);
+}
+
+.zcf-checkout-result a {
+	color: inherit;
+	font-weight: 700;
+}
+
 .zcf-message:empty {
 	display: none;
 }
