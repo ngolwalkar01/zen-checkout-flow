@@ -58,10 +58,11 @@ body.zcf-popup-open {
 .zcf-popup-loading {
 	width: min(92vw, 620px);
 	margin: 0 auto;
-	padding: 28px;
+	padding: 18px;
 	border-radius: 18px;
 	background: rgba(38, 39, 34, 0.95);
 	color: #f4f1e8;
+	font-size: 14px;
 	text-align: center;
 }
 
@@ -78,11 +79,11 @@ body.zcf-popup-open {
 
 .zcf-modal {
 	position: relative;
-	width: min(90vw, 1720px);
-	min-height: min(86vh, 900px);
+	width: min(92vw, 1180px);
+	min-height: auto;
 	margin: 0 auto;
-	padding: clamp(34px, 4vw, 64px) clamp(28px, 4.5vw, 86px);
-	border-radius: 38px;
+	padding: 30px 44px 38px;
+	border-radius: 24px;
 	overflow: hidden;
 	background:
 		radial-gradient(circle at 38% 102%, rgba(226, 190, 82, 0.32), transparent 30%),
@@ -108,12 +109,12 @@ body.zcf-popup-open {
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
-	margin-bottom: clamp(34px, 5vw, 70px);
+	margin-bottom: 24px;
 }
 
 .zcf-icon-button {
-	width: 62px;
-	height: 62px;
+	width: 38px;
+	height: 38px;
 	border: 0;
 	padding: 0;
 	background: transparent;
@@ -135,26 +136,26 @@ body.zcf-popup-open {
 .zcf-back::after {
 	content: "";
 	position: absolute;
-	left: 10px;
-	top: 30px;
-	height: 4px;
+	left: 7px;
+	top: 18px;
+	height: 2px;
 	border-radius: 4px;
 	background: rgba(244, 241, 232, 0.72);
 }
 
 .zcf-back::before {
-	width: 56px;
+	width: 34px;
 }
 
 .zcf-back::after {
-	width: 28px;
+	width: 16px;
 	transform: rotate(-45deg);
 	transform-origin: left center;
 }
 
 .zcf-close {
 	position: relative;
-	border: 6px solid rgba(244, 241, 232, 0.58);
+	border: 3px solid rgba(244, 241, 232, 0.58);
 	border-radius: 50%;
 }
 
@@ -162,10 +163,10 @@ body.zcf-popup-open {
 .zcf-close::after {
 	content: "";
 	position: absolute;
-	left: 14px;
-	top: 26px;
-	width: 26px;
-	height: 6px;
+	left: 8px;
+	top: 16px;
+	width: 16px;
+	height: 3px;
 	border-radius: 6px;
 	background: rgba(244, 241, 232, 0.72);
 }
@@ -180,8 +181,8 @@ body.zcf-popup-open {
 
 .zcf-grid {
 	display: grid;
-	grid-template-columns: minmax(360px, 0.9fr) minmax(430px, 1fr);
-	gap: clamp(42px, 6vw, 92px);
+	grid-template-columns: minmax(300px, 0.9fr) minmax(360px, 1fr);
+	gap: 42px;
 	align-items: start;
 	max-width: 1480px;
 	margin: 0 auto;
@@ -189,22 +190,22 @@ body.zcf-popup-open {
 
 .zcf-customer {
 	display: grid;
-	grid-template-columns: 72px minmax(0, 1fr);
-	gap: 28px;
+	grid-template-columns: 46px minmax(0, 1fr);
+	gap: 14px;
 	align-items: center;
-	margin-bottom: 42px;
+	margin-bottom: 24px;
 }
 
 .zcf-avatar {
-	width: 72px;
-	height: 72px;
+	width: 46px;
+	height: 46px;
 	border-radius: 50%;
 	object-fit: cover;
 }
 
 .zcf-customer-name {
-	font-size: clamp(22px, 1.7vw, 30px);
-	line-height: 1.25;
+	font-size: 16px;
+	line-height: 1.3;
 	font-weight: 500;
 }
 
@@ -216,63 +217,63 @@ body.zcf-popup-open {
 }
 
 .zcf-customer-email {
-	margin-top: 8px;
-	font-size: clamp(20px, 1.6vw, 30px);
-	line-height: 1.25;
+	margin-top: 3px;
+	font-size: 16px;
+	line-height: 1.3;
 	overflow-wrap: anywhere;
 }
 
 .zcf-section-title {
-	margin-bottom: 22px;
-	font-size: clamp(24px, 1.8vw, 32px);
-	line-height: 1.2;
+	margin-bottom: 12px;
+	font-size: 16px;
+	line-height: 1.3;
 	font-weight: 500;
 }
 
 .zcf-product-card {
-	padding: clamp(24px, 2.4vw, 32px);
-	border: 4px solid var(--zcf-gold);
-	border-radius: 16px;
+	padding: 18px;
+	border: 2px solid var(--zcf-gold);
+	border-radius: 12px;
 	background: rgba(25, 28, 26, 0.38);
 }
 
 .zcf-product-main {
 	display: grid;
 	grid-template-columns: minmax(0, 1fr) auto;
-	gap: 24px;
-	padding-bottom: 28px;
-	border-bottom: 2px solid rgba(244, 241, 232, 0.5);
+	gap: 16px;
+	padding-bottom: 16px;
+	border-bottom: 1px solid rgba(244, 241, 232, 0.5);
 }
 
 .zcf-product-card h3 {
-	margin: 0 0 24px;
-	font-size: clamp(24px, 1.9vw, 32px);
-	line-height: 1.28;
+	margin: 0 0 10px;
+	font-size: 16px;
+	line-height: 1.35;
 	font-weight: 700;
 }
 
 .zcf-product-meta {
-	font-size: clamp(18px, 1.5vw, 27px);
+	font-size: 14px;
 	line-height: 1.45;
 }
 
 .zcf-product-price {
-	min-width: 150px;
+	min-width: 110px;
 	color: var(--zcf-gold);
 	text-align: right;
 }
 
 .zcf-product-price strong {
 	display: block;
-	font-size: clamp(24px, 1.9vw, 32px);
-	line-height: 1.25;
+	font-size: 16px;
+	line-height: 1.3;
 }
 
 .zcf-product-price span {
 	display: block;
-	margin-top: 6px;
+	margin-top: 2px;
 	color: var(--zcf-text);
-	font-size: clamp(16px, 1.3vw, 22px);
+	font-size: 14px;
 	font-weight: 400;
 	opacity: 0.72;
 }
@@ -287,13 +288,13 @@ body.zcf-popup-open {
 
 .zcf-product-cta {
 	width: 100%;
-	height: 74px;
-	margin: 30px 0 26px;
+	height: 44px;
+	margin: 18px 0 14px;
 	border-radius: 999px;
 	background: var(--zcf-gold);
 	color: #3f3f42;
-	font-size: clamp(18px, 1.35vw, 24px);
-	box-shadow: inset 0 0 0 4px rgba(41, 41, 42, 0.22);
+	font-size: 14px;
+	box-shadow: inset 0 0 0 2px rgba(41, 41, 42, 0.22);
 }
 
 .zcf-product-cta:hover,
@@ -304,7 +305,7 @@ body.zcf-popup-open {
 
 .zcf-more {
 	color: var(--zcf-gold);
-	font-size: clamp(18px, 1.35vw, 25px);
+	font-size: 14px;
 	font-weight: 700;
 }
 
@@ -322,7 +323,7 @@ body.zcf-popup-open {
 
 .zcf-more summary::after {
 	content: "+";
-	font-size: 54px;
+	font-size: 28px;
 	line-height: 0.7;
 	font-weight: 300;
 }
@@ -332,54 +333,54 @@ body.zcf-popup-open {
 }
 
 .zcf-more-body {
-	margin-top: 18px;
+	margin-top: 10px;
 	color: var(--zcf-muted);
-	font-size: 16px;
+	font-size: 14px;
 	font-weight: 400;
 }
 
 .zcf-right h2 {
-	margin: 0 0 18px;
-	font-size: clamp(24px, 1.8vw, 32px);
-	line-height: 1.25;
+	margin: 0 0 8px;
+	font-size: 16px;
+	line-height: 1.3;
 	font-weight: 500;
 }
 
 .zcf-muted {
-	margin: 0 0 18px;
-	font-size: clamp(18px, 1.4vw, 26px);
+	margin: 0 0 12px;
+	font-size: 14px;
 	line-height: 1.35;
 }
 
 .zcf-payment-panel {
-	padding: clamp(24px, 2.5vw, 32px);
-	border: 4px solid var(--zcf-border);
-	border-radius: 16px;
+	padding: 18px;
+	border: 2px solid var(--zcf-border);
+	border-radius: 12px;
 	background: rgba(74, 71, 65, 0.35);
 }
 
 .zcf-panel-date {
-	margin-bottom: 28px;
+	margin-bottom: 14px;
 	color: var(--zcf-muted);
-	font-size: clamp(18px, 1.4vw, 26px);
+	font-size: 14px;
 }
 
 .zcf-coupon {
 	display: grid;
-	grid-template-columns: minmax(0, 1fr) 150px;
-	gap: 14px;
-	margin-bottom: 28px;
+	grid-template-columns: minmax(0, 1fr) 92px;
+	gap: 10px;
+	margin-bottom: 16px;
 }
 
 .zcf-coupon input {
 	width: 100%;
-	height: 82px;
-	border: 4px solid var(--zcf-border);
-	border-radius: 14px;
-	padding: 0 24px;
+	height: 44px;
+	border: 2px solid var(--zcf-border);
+	border-radius: 10px;
+	padding: 0 14px;
 	background: var(--zcf-field);
 	color: var(--zcf-text);
-	font-size: clamp(18px, 1.4vw, 26px);
+	font-size: 14px;
 	outline: none;
 }
 
@@ -388,25 +389,25 @@ body.zcf-popup-open {
 }
 
 .zcf-coupon button {
-	height: 78px;
-	border: 4px solid var(--zcf-border);
+	height: 42px;
+	border: 2px solid var(--zcf-border);
 	border-radius: 999px;
 	background: rgba(63, 63, 65, 0.95);
 	color: var(--zcf-text);
-	font-size: clamp(18px, 1.35vw, 25px);
+	font-size: 14px;
 }
 
 .zcf-applied-coupons {
 	display: flex;
 	flex-wrap: wrap;
 	gap: 10px;
-	margin: -10px 0 22px;
+	margin: -6px 0 14px;
 }
 
 .zcf-applied-coupons button {
 	border: 1px solid rgba(226, 190, 82, 0.8);
 	border-radius: 999px;
-	padding: 8px 14px;
+	padding: 5px 10px;
 	background: rgba(226, 190, 82, 0.14);
 	color: var(--zcf-gold);
 	cursor: pointer;
@@ -415,10 +416,10 @@ body.zcf-popup-open {
 .zcf-summary {
 	display: flex;
 	justify-content: space-between;
-	gap: 20px;
-	margin-bottom: 32px;
-	font-size: clamp(20px, 1.55vw, 30px);
-	line-height: 1.25;
+	gap: 14px;
+	margin-bottom: 18px;
+	font-size: 14px;
+	line-height: 1.35;
 }
 
 .zcf-summary strong span {
@@ -431,26 +432,26 @@ body.zcf-popup-open {
 }
 
 .zcf-payment-label {
-	margin-bottom: 26px;
-	font-size: clamp(18px, 1.4vw, 26px);
+	margin-bottom: 12px;
+	font-size: 14px;
 }
 
 .zcf-gateways {
 	display: grid;
-	gap: 26px;
+	gap: 12px;
 }
 
 .zcf-gateway {
 	display: grid;
 	grid-template-columns: 1fr auto;
 	align-items: center;
-	min-height: 88px;
-	padding: 0 22px;
-	border: 4px solid var(--zcf-border);
-	border-radius: 14px;
+	min-height: 48px;
+	padding: 0 14px;
+	border: 2px solid var(--zcf-border);
+	border-radius: 10px;
 	background: var(--zcf-light);
 	color: #3d3d3f;
-	font-size: clamp(18px, 1.45vw, 26px);
+	font-size: 14px;
 	cursor: pointer;
 }
 
@@ -469,14 +470,14 @@ body.zcf-popup-open {
 	display: flex;
 	align-items: center;
 	justify-content: flex-end;
-	min-width: 118px;
+	min-width: 86px;
 	font-style: normal;
 	font-weight: 700;
 }
 
 .zcf-gateway img {
-	max-height: 42px;
-	max-width: 160px;
+	max-height: 28px;
+	max-width: 110px;
 }
 
 .zcf-no-gateways {
@@ -484,9 +485,9 @@ body.zcf-popup-open {
 }
 
 .zcf-terms {
-	margin: 24px 0 18px;
+	margin: 14px 0 12px;
 	max-width: 680px;
-	font-size: clamp(18px, 1.35vw, 25px);
+	font-size: 14px;
 	line-height: 1.35;
 }
 
@@ -498,27 +499,27 @@ body.zcf-popup-open {
 
 .zcf-pay-button {
 	width: 100%;
-	min-height: 90px;
-	border: 4px solid rgba(60, 60, 62, 0.85);
+	min-height: 50px;
+	border: 2px solid rgba(60, 60, 62, 0.85);
 	border-radius: 999px;
 	background: #aeb0b2;
 	color: #434447;
-	font-size: clamp(22px, 1.7vw, 30px);
+	font-size: 16px;
 }
 
 .zcf-message {
-	margin-bottom: 18px;
-	padding: 14px 18px;
+	margin-bottom: 12px;
+	padding: 10px 12px;
 	border-radius: 10px;
-	font-size: 16px;
+	font-size: 14px;
 }
 
 .zcf-checkout-result,
 .zen-checkout-loading {
-	margin-top: 16px;
-	padding: 14px 18px;
+	margin-top: 12px;
+	padding: 10px 12px;
 	border-radius: 10px;
-	font-size: 16px;
+	font-size: 14px;
 	line-height: 1.45;
 }
 
@@ -575,7 +576,7 @@ body.zcf-popup-open {
 .zcf-state {
 	display: grid;
 	place-items: center;
-	min-height: 430px;
+	min-height: 300px;
 }
 
 .zcf-state-inner {
@@ -584,25 +585,25 @@ body.zcf-popup-open {
 }
 
 .zcf-state-inner h2 {
-	margin: 0 0 14px;
-	font-size: clamp(26px, 2.2vw, 40px);
+	margin: 0 0 10px;
+	font-size: 16px;
 }
 
 .zcf-state-inner p {
 	margin: 0;
 	color: var(--zcf-muted);
-	font-size: 20px;
+	font-size: 14px;
 }
 
 @media (max-width: 980px) {
 	.zcf-modal {
 		width: min(94vw, 760px);
-		padding: 28px 20px;
-		border-radius: 24px;
+		padding: 22px 16px 26px;
+		border-radius: 18px;
 	}
 
 	.zcf-topbar {
-		margin-bottom: 28px;
+		margin-bottom: 18px;
 	}
 
 	.zcf-icon-button {
@@ -627,17 +628,17 @@ body.zcf-popup-open {
 
 	.zcf-grid {
 		grid-template-columns: 1fr;
-		gap: 34px;
+		gap: 24px;
 	}
 
 	.zcf-customer {
-		grid-template-columns: 58px minmax(0, 1fr);
-		gap: 18px;
+		grid-template-columns: 42px minmax(0, 1fr);
+		gap: 12px;
 	}
 
 	.zcf-avatar {
-		width: 58px;
-		height: 58px;
+		width: 42px;
+		height: 42px;
 	}
 
 	.zcf-product-main,
@@ -658,7 +659,7 @@ body.zcf-popup-open {
 	.zcf-gateway,
 	.zcf-product-cta,
 	.zcf-pay-button {
-		min-height: 64px;
+		min-height: 44px;
 		height: auto;
 	}
 }
