@@ -77,6 +77,65 @@
 			});
 	}
 
+	function getPopup() {
+		return $('#zcf-popup');
+	}
+
+	function getPopupStage() {
+		return getPopup().find('[data-zcf-popup-stage]');
+	}
+
+	function openPopup() {
+		var $popup = getPopup();
+		var $stage = getPopupStage();
+
+		if (!$popup.length || !$stage.length) {
+			return;
+		}
+
+		$popup.addClass('is-active').attr('aria-hidden', 'false');
+		$('body').addClass('zcf-popup-open');
+		$stage.html('<div class="zcf-popup-loading">' + zcfCheckout.i18n.loading + '</div>');
+
+		$.ajax({
+			type: 'POST',
+			url: zcfCheckout.ajaxUrl,
+			data: {
+				action: 'zcf_render_checkout',
+				nonce: zcfCheckout.nonce
+			}
+		})
+			.done(function (response) {
+				if (response && response.success && response.data && response.data.html) {
+					$stage.html(response.data.html);
+					return;
+				}
+
+				$stage.html('<div class="zcf-popup-loading">' + zcfCheckout.i18n.error + '</div>');
+			})
+			.fail(function () {
+				$stage.html('<div class="zcf-popup-loading">' + zcfCheckout.i18n.error + '</div>');
+			});
+	}
+
+	function closePopup() {
+		getPopup().removeClass('is-active').attr('aria-hidden', 'true');
+		$('body').removeClass('zcf-popup-open');
+	}
+
+	function isCartOrCheckoutUrl(url) {
+		var targets = [zcfCheckout.cartUrl, zcfCheckout.checkoutUrl].filter(Boolean);
+		var normalizedUrl = normalizeUrl(url);
+
+		return targets.some(function (target) {
+			return normalizedUrl === normalizeUrl(target);
+		});
+	}
+
+	function normalizeUrl(url) {
+		return String(url || '').replace(/\/+$/, '');
+	}
+
 	$(document).on('submit', '[data-zcf-coupon]', function (event) {
 		event.preventDefault();
 
@@ -187,10 +246,40 @@
 	});
 
 	$(document).on('click', '[data-zcf-back]', function () {
-		$(document).trigger('zenCheckoutFlow:back', [$(this).closest('[data-zcf-checkout-flow]')]);
+		closePopup();
 	});
 
 	$(document).on('click', '[data-zcf-close]', function () {
-		$(document).trigger('zenCheckoutFlow:close', [$(this).closest('[data-zcf-checkout-flow]')]);
+		closePopup();
+	});
+
+	$(document).on('click', '[data-zcf-popup-close], [data-zcf-open-checkout]', function (event) {
+		event.preventDefault();
+
+		if ($(this).is('[data-zcf-popup-close]')) {
+			closePopup();
+			return;
+		}
+
+		openPopup();
+	});
+
+	$(document).on('click', 'a[href]', function (event) {
+		if (!isCartOrCheckoutUrl(this.href)) {
+			return;
+		}
+
+		event.preventDefault();
+		openPopup();
+	});
+
+	$(document.body).on('added_to_cart', function () {
+		openPopup();
+	});
+
+	$(document).on('keydown', function (event) {
+		if (event.key === 'Escape' && getPopup().hasClass('is-active')) {
+			closePopup();
+		}
 	});
 })(jQuery);

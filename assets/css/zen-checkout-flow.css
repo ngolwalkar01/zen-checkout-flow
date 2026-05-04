@@ -13,6 +13,58 @@
 	font-family: inherit;
 }
 
+body.zcf-popup-open {
+	overflow: hidden;
+}
+
+.zcf-popup {
+	position: fixed;
+	inset: 0;
+	z-index: 10020;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 24px;
+	opacity: 0;
+	visibility: hidden;
+	pointer-events: none;
+	transition: opacity 0.25s ease, visibility 0.25s ease;
+}
+
+.zcf-popup.is-active {
+	opacity: 1;
+	visibility: visible;
+	pointer-events: auto;
+}
+
+.zcf-popup-backdrop {
+	position: absolute;
+	inset: 0;
+	background: rgba(0, 0, 0, 0.72);
+	backdrop-filter: blur(18px);
+	-webkit-backdrop-filter: blur(18px);
+}
+
+.zcf-popup-stage {
+	position: relative;
+	z-index: 1;
+	width: 100%;
+	max-height: calc(100vh - 48px);
+	overflow-y: auto;
+	scrollbar-width: thin;
+	scrollbar-color: #e2be52 rgba(30, 30, 30, 0.8);
+}
+
+.zcf-popup-loading {
+	width: min(92vw, 620px);
+	margin: 0 auto;
+	padding: 28px;
+	border-radius: 18px;
+	background: rgba(38, 39, 34, 0.95);
+	color: #f4f1e8;
+	text-align: center;
+}
+
 .zcf-shell * {
 	box-sizing: border-box;
 }

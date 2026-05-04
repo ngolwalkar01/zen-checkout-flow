@@ -31,7 +31,9 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			add_shortcode( 'zen_checkout_flow', array( __CLASS__, 'render_shortcode' ) );
 
 			add_action( 'wp_enqueue_scripts', array( __CLASS__, 'register_assets' ) );
+			add_action( 'wp_footer', array( __CLASS__, 'render_popup_root' ) );
 			add_action( 'wp_ajax_zcf_render_checkout', array( __CLASS__, 'ajax_render_checkout' ) );
+			add_action( 'wp_ajax_nopriv_zcf_render_checkout', array( __CLASS__, 'ajax_render_checkout' ) );
 			add_action( 'wp_ajax_zcf_refresh_checkout', array( __CLASS__, 'ajax_refresh_checkout' ) );
 			add_action( 'wp_ajax_zcf_apply_coupon', array( __CLASS__, 'ajax_apply_coupon' ) );
 			add_action( 'wp_ajax_zcf_remove_coupon', array( __CLASS__, 'ajax_remove_coupon' ) );
@@ -92,6 +94,7 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 					'ajaxUrl'     => admin_url( 'admin-ajax.php' ),
 					'nonce'       => wp_create_nonce( self::NONCE_ACTION ),
 					'checkoutUrl' => self::dependencies_loaded() ? wc_get_checkout_url() : '',
+					'cartUrl'     => self::dependencies_loaded() ? wc_get_cart_url() : '',
 					'checkoutAjaxUrl' => self::dependencies_loaded() && class_exists( 'WC_AJAX' ) ? WC_AJAX::get_endpoint( 'checkout' ) : '',
 					'checkoutNonce' => wp_create_nonce( 'woocommerce-process_checkout' ),
 					'myAccountUrl' => self::dependencies_loaded() ? wc_get_page_permalink( 'myaccount' ) : '',
@@ -142,10 +145,28 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 		}
 
 		/**
-		 * Render checkout shell for theme modal injection.
+		 * Render the plugin-owned popup mount point.
+		 */
+		public static function render_popup_root() {
+			if ( is_admin() || ! self::dependencies_loaded() ) {
+				return;
+			}
+
+			?>
+			<div id="zcf-popup" class="zcf-popup" aria-hidden="true">
+				<div class="zcf-popup-backdrop" data-zcf-popup-close></div>
+				<div class="zcf-popup-stage" data-zcf-popup-stage>
+					<div class="zcf-popup-loading"><?php esc_html_e( 'Loading checkout...', 'zen-checkout-flow' ); ?></div>
+				</div>
+			</div>
+			<?php
+		}
+
+		/**
+		 * Render checkout shell for the plugin-owned popup.
 		 */
 		public static function ajax_render_checkout() {
-			self::verify_ajax();
+			self::verify_ajax( false );
 
 			wp_send_json_success(
 				array(
@@ -577,14 +598,14 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 		/**
 		 * Verify AJAX request.
 		 */
-		private static function verify_ajax() {
+		private static function verify_ajax( $require_login = true ) {
 			if ( ! self::dependencies_loaded() ) {
 				wp_send_json_error( array( 'message' => __( 'WooCommerce is unavailable.', 'zen-checkout-flow' ) ) );
 			}
 
 			check_ajax_referer( self::NONCE_ACTION, 'nonce' );
 
-			if ( ! is_user_logged_in() ) {
+			if ( $require_login && ! is_user_logged_in() ) {
 				wp_send_json_error( array( 'message' => __( 'Please log in to continue.', 'zen-checkout-flow' ) ) );
 			}
 		}
