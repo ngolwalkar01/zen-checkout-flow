@@ -32,6 +32,7 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 
 			add_action( 'wp_enqueue_scripts', array( __CLASS__, 'register_assets' ) );
 			add_action( 'wp_footer', array( __CLASS__, 'render_popup_root' ) );
+			add_filter( 'woocommerce_add_to_cart_redirect', array( __CLASS__, 'redirect_add_to_cart_to_popup' ), 20, 2 );
 			add_action( 'wp_ajax_zcf_render_checkout', array( __CLASS__, 'ajax_render_checkout' ) );
 			add_action( 'wp_ajax_nopriv_zcf_render_checkout', array( __CLASS__, 'ajax_render_checkout' ) );
 			add_action( 'wp_ajax_zcf_refresh_checkout', array( __CLASS__, 'ajax_refresh_checkout' ) );
@@ -95,6 +96,7 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 					'nonce'       => wp_create_nonce( self::NONCE_ACTION ),
 					'checkoutUrl' => self::dependencies_loaded() ? wc_get_checkout_url() : '',
 					'cartUrl'     => self::dependencies_loaded() ? wc_get_cart_url() : '',
+					'autoOpen'    => self::should_auto_open_popup(),
 					'checkoutAjaxUrl' => self::dependencies_loaded() && class_exists( 'WC_AJAX' ) ? WC_AJAX::get_endpoint( 'checkout' ) : '',
 					'checkoutNonce' => wp_create_nonce( 'woocommerce-process_checkout' ),
 					'myAccountUrl' => self::dependencies_loaded() ? wc_get_page_permalink( 'myaccount' ) : '',
@@ -142,6 +144,40 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			</div>
 			<?php
 			return ob_get_clean();
+		}
+
+		/**
+		 * Keep non-AJAX add-to-cart flows on the current page and open the popup after reload.
+		 *
+		 * @param string     $url     Redirect URL.
+		 * @param WC_Product $product Added product.
+		 * @return string
+		 */
+		public static function redirect_add_to_cart_to_popup( $url, $product = null ) {
+			if ( is_admin() || wp_doing_ajax() || ! self::dependencies_loaded() ) {
+				return $url;
+			}
+
+			$redirect_url = wp_validate_redirect( wp_get_referer(), home_url( '/' ) );
+
+			return add_query_arg( 'zcf_open_checkout', '1', remove_query_arg( array( 'add-to-cart', 'zcf_open_checkout' ), $redirect_url ) );
+		}
+
+		/**
+		 * Whether the popup should open automatically on page load.
+		 *
+		 * @return bool
+		 */
+		private static function should_auto_open_popup() {
+			if ( ! self::dependencies_loaded() ) {
+				return false;
+			}
+
+			$has_open_flag = isset( $_GET['zcf_open_checkout'] ) && '1' === wc_clean( wp_unslash( $_GET['zcf_open_checkout'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+
+			return ( function_exists( 'is_cart' ) && is_cart() )
+				|| ( function_exists( 'is_checkout' ) && is_checkout() && ( ! function_exists( 'is_order_received_page' ) || ! is_order_received_page() ) )
+				|| $has_open_flag;
 		}
 
 		/**

@@ -125,15 +125,22 @@
 
 	function isCartOrCheckoutUrl(url) {
 		var targets = [zcfCheckout.cartUrl, zcfCheckout.checkoutUrl].filter(Boolean);
-		var normalizedUrl = normalizeUrl(url);
+		var normalizedUrl = parseComparableUrl(url);
 
 		return targets.some(function (target) {
-			return normalizedUrl === normalizeUrl(target);
+			var normalizedTarget = parseComparableUrl(target);
+
+			return normalizedUrl.origin === normalizedTarget.origin && normalizedUrl.pathname === normalizedTarget.pathname;
 		});
 	}
 
-	function normalizeUrl(url) {
-		return String(url || '').replace(/\/+$/, '');
+	function parseComparableUrl(url) {
+		var parsedUrl = new URL(String(url || ''), window.location.href);
+
+		return {
+			origin: parsedUrl.origin,
+			pathname: parsedUrl.pathname.replace(/\/+$/, '')
+		};
 	}
 
 	$(document).on('submit', '[data-zcf-coupon]', function (event) {
@@ -275,6 +282,12 @@
 
 	$(document.body).on('added_to_cart', function () {
 		openPopup();
+	});
+
+	$(function () {
+		if (zcfCheckout.autoOpen) {
+			openPopup();
+		}
 	});
 
 	$(document).on('keydown', function (event) {
