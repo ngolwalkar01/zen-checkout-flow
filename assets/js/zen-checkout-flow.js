@@ -47,6 +47,34 @@
 			.html(message || '');
 	}
 
+	function openThemeLoginPopup() {
+		if (window.zenctuaryAuth && typeof window.zenctuaryAuth.openModal === 'function') {
+			window.zenctuaryAuth.openModal('login');
+			return true;
+		}
+
+		var trigger = document.querySelector('[data-auth="login"]');
+
+		if (trigger) {
+			trigger.click();
+			return true;
+		}
+
+		return false;
+	}
+
+	function shouldUseThemeLogin() {
+		return !zcfCheckout.isLoggedIn;
+	}
+
+	function openLoginFlowOrFallback() {
+		if (shouldUseThemeLogin() && openThemeLoginPopup()) {
+			return true;
+		}
+
+		return false;
+	}
+
 	function request($shell, action, payload) {
 		setLoading($shell, true);
 
@@ -64,6 +92,11 @@
 			.done(function (response) {
 				if (response && response.success) {
 					updateFragments($shell, response.data || {});
+					return;
+				}
+
+				if (response && response.data && response.data.loggedOut && openLoginFlowOrFallback()) {
+					closePopup();
 					return;
 				}
 
@@ -90,6 +123,10 @@
 		var $stage = getPopupStage();
 
 		if (!$popup.length || !$stage.length) {
+			return;
+		}
+
+		if (openLoginFlowOrFallback()) {
 			return;
 		}
 
@@ -254,6 +291,12 @@
 
 	$(document).on('click', '[data-zcf-back]', function () {
 		closePopup();
+	});
+
+	$(document).on('click', '[data-zcf-login]', function () {
+		if (openThemeLoginPopup()) {
+			closePopup();
+		}
 	});
 
 	$(document).on('click', '[data-zcf-close]', function () {

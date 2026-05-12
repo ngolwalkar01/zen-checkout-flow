@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Zen Checkout Flow
  * Description: Popup-based WooCommerce checkout/cart flow for logged-in customers.
- * Version: 0.1.1
+ * Version: 0.1.2
  * Author: Custom
  * Text Domain: zen-checkout-flow
  *
@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
 if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 	final class ZCF_Zen_Checkout_Flow {
 
-		const VERSION = '0.1.1';
+		const VERSION = '0.1.2';
 		const NONCE_ACTION = 'zcf_checkout_flow';
 
 		/**
@@ -100,6 +100,7 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 					'checkoutAjaxUrl' => self::dependencies_loaded() && class_exists( 'WC_AJAX' ) ? WC_AJAX::get_endpoint( 'checkout' ) : '',
 					'checkoutNonce' => wp_create_nonce( 'woocommerce-process_checkout' ),
 					'myAccountUrl' => self::dependencies_loaded() ? wc_get_page_permalink( 'myaccount' ) : '',
+					'isLoggedIn'   => is_user_logged_in(),
 					'customer'    => self::get_checkout_customer_data(),
 					'i18n'        => array(
 						'loading' => __( 'Updating...', 'zen-checkout-flow' ),
@@ -333,6 +334,7 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 				<div class="zcf-state-inner">
 					<h2><?php esc_html_e( 'Please log in to view your cart.', 'zen-checkout-flow' ); ?></h2>
 					<p><?php esc_html_e( 'This checkout flow is available only for logged-in customers.', 'zen-checkout-flow' ); ?></p>
+					<button type="button" class="zcf-button zcf-button-primary" data-zcf-login><?php esc_html_e( 'Log in', 'zen-checkout-flow' ); ?></button>
 				</div>
 			</div>
 			<?php
@@ -642,7 +644,12 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			check_ajax_referer( self::NONCE_ACTION, 'nonce' );
 
 			if ( $require_login && ! is_user_logged_in() ) {
-				wp_send_json_error( array( 'message' => __( 'Please log in to continue.', 'zen-checkout-flow' ) ) );
+				wp_send_json_error(
+					array(
+						'message'   => __( 'Please log in to continue.', 'zen-checkout-flow' ),
+						'loggedOut' => true,
+					)
+				);
 			}
 		}
 
