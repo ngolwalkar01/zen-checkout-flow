@@ -48,6 +48,16 @@
 	}
 
 	function openThemeLoginPopup() {
+		var checkoutReturnUrl;
+
+		try {
+			checkoutReturnUrl = new URL(window.location.href);
+			checkoutReturnUrl.searchParams.set('zcf_open_checkout', '1');
+			window.sessionStorage.setItem('zenctuary_post_auth_redirect', checkoutReturnUrl.toString());
+		} catch (error) {
+			// Ignore URL/storage issues and continue with the popup fallback.
+		}
+
 		if (window.zenctuaryAuth && typeof window.zenctuaryAuth.openModal === 'function') {
 			window.zenctuaryAuth.openModal('login');
 			return true;
