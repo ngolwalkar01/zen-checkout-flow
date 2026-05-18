@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Zen Checkout Flow
  * Description: Popup-based WooCommerce checkout/cart flow for logged-in customers.
- * Version: 0.1.4
+ * Version: 0.1.5
  * Author: Custom
  * Text Domain: zen-checkout-flow
  *
@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
 if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 	final class ZCF_Zen_Checkout_Flow {
 
-		const VERSION = '0.1.4';
+		const VERSION = '0.1.5';
 		const NONCE_ACTION = 'zcf_checkout_flow';
 
 		/**
@@ -272,15 +272,9 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 							<a href="<?php echo esc_url( wc_get_page_permalink( 'terms' ) ); ?>"><?php esc_html_e( 'terms and conditions.', 'zen-checkout-flow' ); ?></a>
 						</p>
 
-						<button type="button" class="zcf-pay-button" data-zcf-pay>
-							<?php
-							printf(
-								/* translators: %s: cart total */
-								esc_html__( 'Pay %s', 'zen-checkout-flow' ),
-								wp_kses_post( WC()->cart->get_total() )
-							);
-							?>
-						</button>
+						<div data-zcf-primary-action>
+							<?php echo self::render_primary_action(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+						</div>
 						<div class="zcf-checkout-result" data-zcf-checkout-result aria-live="polite"></div>
 					</section>
 				</div>
@@ -496,6 +490,8 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 		 * @return string
 		 */
 		private static function render_payment_panel() {
+			$context            = self::get_checkout_context();
+			$mode               = isset( $context['mode'] ) ? $context['mode'] : 'money_purchase';
 			$available_gateways = WC()->payment_gateways() ? WC()->payment_gateways()->get_available_payment_gateways() : array();
 			$chosen_gateway     = WC()->session ? WC()->session->get( 'chosen_payment_method' ) : '';
 
@@ -509,35 +505,106 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			<?php echo self::render_checkout_context_debug(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 			<div class="zcf-panel-date"><?php echo esc_html( date_i18n( get_option( 'date_format' ) ) ); ?></div>
 
-			<form class="zcf-coupon" data-zcf-coupon>
-				<input type="text" name="coupon_code" placeholder="<?php echo esc_attr__( 'Discount Code', 'zen-checkout-flow' ); ?>" autocomplete="off" />
-				<button type="submit"><?php esc_html_e( 'Apply', 'zen-checkout-flow' ); ?></button>
-			</form>
-
-			<?php echo self::render_applied_coupons(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
-
 			<div class="zcf-summary">
 				<strong><?php esc_html_e( 'Order Summary', 'zen-checkout-flow' ); ?> <span><?php esc_html_e( '(incl. VAT):', 'zen-checkout-flow' ); ?></span></strong>
 				<b><?php echo wp_kses_post( WC()->cart->get_total() ); ?></b>
 			</div>
 
-			<div class="zcf-payment-label"><?php esc_html_e( 'Payment method:', 'zen-checkout-flow' ); ?></div>
+			<?php if ( in_array( $mode, array( 'money_purchase', 'mixed_recovery' ), true ) ) : ?>
+				<form class="zcf-coupon" data-zcf-coupon>
+					<input type="text" name="coupon_code" placeholder="<?php echo esc_attr__( 'Discount Code', 'zen-checkout-flow' ); ?>" autocomplete="off" />
+					<button type="submit"><?php esc_html_e( 'Apply', 'zen-checkout-flow' ); ?></button>
+				</form>
 
-			<div class="zcf-gateways" data-zcf-gateways>
-				<?php if ( $available_gateways ) : ?>
-					<?php foreach ( $available_gateways as $gateway_id => $gateway ) : ?>
-						<label class="zcf-gateway <?php echo checked( $chosen_gateway, $gateway_id, false ) ? 'is-selected' : ''; ?>">
-							<input type="radio" name="payment_method" value="<?php echo esc_attr( $gateway_id ); ?>" <?php checked( $chosen_gateway, $gateway_id ); ?> />
-							<span><?php echo esc_html( $gateway->get_title() ); ?></span>
-							<em><?php echo wp_kses_post( $gateway->get_icon() ); ?></em>
-						</label>
-					<?php endforeach; ?>
-				<?php else : ?>
-					<div class="zcf-no-gateways"><?php esc_html_e( 'No payment methods are available for this order.', 'zen-checkout-flow' ); ?></div>
+				<?php echo self::render_applied_coupons(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+
+				<div class="zcf-payment-label"><?php esc_html_e( 'Payment method:', 'zen-checkout-flow' ); ?></div>
+
+				<?php if ( 'mixed_recovery' === $mode ) : ?>
+					<?php echo self::render_mode_notice( __( 'Add a qualifying credit product and complete payment first. After credits are granted, the booking flow will be able to continue.', 'zen-checkout-flow' ), 'info' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 				<?php endif; ?>
-			</div>
+
+				<div class="zcf-gateways" data-zcf-gateways>
+					<?php if ( $available_gateways ) : ?>
+						<?php foreach ( $available_gateways as $gateway_id => $gateway ) : ?>
+							<label class="zcf-gateway <?php echo checked( $chosen_gateway, $gateway_id, false ) ? 'is-selected' : ''; ?>">
+								<input type="radio" name="payment_method" value="<?php echo esc_attr( $gateway_id ); ?>" <?php checked( $chosen_gateway, $gateway_id ); ?> />
+								<span><?php echo esc_html( $gateway->get_title() ); ?></span>
+								<em><?php echo wp_kses_post( $gateway->get_icon() ); ?></em>
+							</label>
+						<?php endforeach; ?>
+					<?php else : ?>
+						<div class="zcf-no-gateways"><?php esc_html_e( 'No payment methods are available for this order.', 'zen-checkout-flow' ); ?></div>
+					<?php endif; ?>
+				</div>
+			<?php elseif ( 'zencoin_booking' === $mode ) : ?>
+				<?php echo self::render_mode_notice( sprintf( __( 'This booking is covered by your wallet. Required: %1$s ZC. Available: %2$s ZC.', 'zen-checkout-flow' ), wc_format_decimal( isset( $context['required_zencoins'] ) ? $context['required_zencoins'] : 0, 2 ), wc_format_decimal( isset( $context['available_zencoins'] ) ? $context['available_zencoins'] : 0, 2 ) ), 'success' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+				<div class="zcf-payment-label"><?php esc_html_e( 'Payment method:', 'zen-checkout-flow' ); ?></div>
+				<div class="zcf-no-gateways"><?php esc_html_e( 'No payment gateway is needed when your booking is fully covered by Zencoins.', 'zen-checkout-flow' ); ?></div>
+			<?php else : ?>
+				<?php echo self::render_mode_notice( sprintf( __( 'You need %1$s more ZC to complete this booking. Add a membership, package, or drop-in to continue.', 'zen-checkout-flow' ), wc_format_decimal( isset( $context['missing_zencoins'] ) ? $context['missing_zencoins'] : 0, 2 ) ), 'warning' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+				<div class="zcf-payment-label"><?php esc_html_e( 'Payment method:', 'zen-checkout-flow' ); ?></div>
+				<div class="zcf-no-gateways"><?php esc_html_e( 'Payment methods stay hidden until a recovery credit product is added to the cart.', 'zen-checkout-flow' ); ?></div>
+			<?php endif; ?>
 			<?php
 			return ob_get_clean();
+		}
+
+		/**
+		 * Render the primary checkout action button for the current mode.
+		 *
+		 * @return string
+		 */
+		private static function render_primary_action() {
+			$context = self::get_checkout_context();
+			$mode    = isset( $context['mode'] ) ? $context['mode'] : 'money_purchase';
+
+			ob_start();
+
+			if ( in_array( $mode, array( 'money_purchase', 'mixed_recovery' ), true ) ) :
+				?>
+				<button type="button" class="zcf-pay-button" data-zcf-pay>
+					<?php
+					printf(
+						/* translators: %s: cart total */
+						esc_html__( 'Pay %s', 'zen-checkout-flow' ),
+						wp_kses_post( WC()->cart->get_total() )
+					);
+					?>
+				</button>
+				<?php
+			elseif ( 'zencoin_booking' === $mode ) :
+				?>
+				<button type="button" class="zcf-pay-button is-disabled" disabled>
+					<?php esc_html_e( 'Book with Zencoins', 'zen-checkout-flow' ); ?>
+				</button>
+				<?php
+			else :
+				?>
+				<button type="button" class="zcf-pay-button is-disabled" disabled>
+					<?php esc_html_e( 'Add credits to continue', 'zen-checkout-flow' ); ?>
+				</button>
+				<?php
+			endif;
+
+			return ob_get_clean();
+		}
+
+		/**
+		 * Render a mode-specific inline notice.
+		 *
+		 * @param string $message Notice message.
+		 * @param string $type    Notice type.
+		 * @return string
+		 */
+		private static function render_mode_notice( $message, $type = 'info' ) {
+			$classes = array( 'zcf-mode-note' );
+
+			if ( in_array( $type, array( 'info', 'success', 'warning' ), true ) ) {
+				$classes[] = 'is-' . $type;
+			}
+
+			return '<div class="' . esc_attr( implode( ' ', $classes ) ) . '">' . esc_html( $message ) . '</div>';
 		}
 
 		/**
@@ -720,11 +787,7 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 				array(
 					'cartItems'     => self::render_cart_items(),
 					'paymentPanel'  => self::render_payment_panel(),
-					'payButtonText' => sprintf(
-						/* translators: %s: cart total */
-						__( 'Pay %s', 'zen-checkout-flow' ),
-						wp_strip_all_tags( WC()->cart->get_total() )
-					),
+					'payButtonHtml' => self::render_primary_action(),
 				)
 			);
 		}

@@ -431,6 +431,32 @@ body.zcf-popup-open {
 	font-size: 14px;
 }
 
+.zcf-mode-note {
+	margin: 0 0 16px;
+	padding: 12px 14px;
+	border-radius: 10px;
+	font-size: 14px;
+	line-height: 1.45;
+}
+
+.zcf-mode-note.is-info {
+	border: 1px solid rgba(232, 232, 226, 0.28);
+	background: rgba(255, 255, 255, 0.06);
+	color: var(--zcf-text);
+}
+
+.zcf-mode-note.is-success {
+	border: 1px solid rgba(72, 208, 128, 0.4);
+	background: rgba(72, 208, 128, 0.12);
+	color: #dff7e8;
+}
+
+.zcf-mode-note.is-warning {
+	border: 1px solid rgba(226, 190, 82, 0.46);
+	background: rgba(226, 190, 82, 0.12);
+	color: #f7ebc0;
+}
+
 .zcf-applied-coupons {
 	display: flex;
 	flex-wrap: wrap;
@@ -539,6 +565,12 @@ body.zcf-popup-open {
 	background: #aeb0b2;
 	color: #434447;
 	font-size: 16px;
+}
+
+.zcf-pay-button.is-disabled,
+.zcf-pay-button:disabled {
+	cursor: not-allowed;
+	opacity: 0.68;
 }
 
 .zcf-message {

@@ -14,8 +14,8 @@
 			$shell.find('[data-zcf-payment-panel]').html(data.paymentPanel);
 		}
 
-		if (data.payButtonText) {
-			$shell.find('[data-zcf-pay]').text(data.payButtonText);
+		if (data.payButtonHtml) {
+			$shell.find('[data-zcf-primary-action]').html(data.payButtonHtml);
 		}
 	}
 
