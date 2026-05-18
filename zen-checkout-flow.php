@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Zen Checkout Flow
  * Description: Popup-based WooCommerce checkout/cart flow for logged-in customers.
- * Version: 0.1.2
+ * Version: 0.1.3
  * Author: Custom
  * Text Domain: zen-checkout-flow
  *
@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
 if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 	final class ZCF_Zen_Checkout_Flow {
 
-		const VERSION = '0.1.2';
+		const VERSION = '0.1.3';
 		const NONCE_ACTION = 'zcf_checkout_flow';
 
 		/**
@@ -506,6 +506,7 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 
 			ob_start();
 			?>
+			<?php echo self::render_checkout_context_debug(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 			<div class="zcf-panel-date"><?php echo esc_html( date_i18n( get_option( 'date_format' ) ) ); ?></div>
 
 			<form class="zcf-coupon" data-zcf-coupon>
@@ -534,6 +535,62 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 				<?php else : ?>
 					<div class="zcf-no-gateways"><?php esc_html_e( 'No payment methods are available for this order.', 'zen-checkout-flow' ); ?></div>
 				<?php endif; ?>
+			</div>
+			<?php
+			return ob_get_clean();
+		}
+
+		/**
+		 * Get Coin Booking Bridge checkout context when available.
+		 *
+		 * @return array
+		 */
+		private static function get_checkout_context() {
+			if ( function_exists( 'cbb_get_checkout_context' ) ) {
+				$context = cbb_get_checkout_context( get_current_user_id() );
+
+				return is_array( $context ) ? $context : array();
+			}
+
+			return array(
+				'mode'               => 'money_purchase',
+				'has_booking_items'  => false,
+				'has_credit_products'=> false,
+				'required_zencoins'  => 0,
+				'available_zencoins' => 0,
+				'missing_zencoins'   => 0,
+				'wallet_is_frozen'   => false,
+				'blocking_reason'    => '',
+			);
+		}
+
+		/**
+		 * Render temporary checkout context debug block.
+		 *
+		 * This is intentionally simple and temporary so mode detection can be
+		 * verified before UI branching is implemented.
+		 *
+		 * @return string
+		 */
+		private static function render_checkout_context_debug() {
+			$context = self::get_checkout_context();
+
+			ob_start();
+			?>
+			<div class="zcf-context-debug" data-zcf-context-debug>
+				<div class="zcf-context-debug__title"><?php esc_html_e( 'Checkout Mode Debug', 'zen-checkout-flow' ); ?></div>
+				<ul class="zcf-context-debug__list">
+					<li><strong><?php esc_html_e( 'Mode:', 'zen-checkout-flow' ); ?></strong> <?php echo esc_html( isset( $context['mode'] ) ? $context['mode'] : 'money_purchase' ); ?></li>
+					<li><strong><?php esc_html_e( 'Has booking items:', 'zen-checkout-flow' ); ?></strong> <?php echo ! empty( $context['has_booking_items'] ) ? esc_html__( 'Yes', 'zen-checkout-flow' ) : esc_html__( 'No', 'zen-checkout-flow' ); ?></li>
+					<li><strong><?php esc_html_e( 'Has credit products:', 'zen-checkout-flow' ); ?></strong> <?php echo ! empty( $context['has_credit_products'] ) ? esc_html__( 'Yes', 'zen-checkout-flow' ) : esc_html__( 'No', 'zen-checkout-flow' ); ?></li>
+					<li><strong><?php esc_html_e( 'Required ZC:', 'zen-checkout-flow' ); ?></strong> <?php echo esc_html( wc_format_decimal( isset( $context['required_zencoins'] ) ? $context['required_zencoins'] : 0, 2 ) ); ?></li>
+					<li><strong><?php esc_html_e( 'Available ZC:', 'zen-checkout-flow' ); ?></strong> <?php echo esc_html( wc_format_decimal( isset( $context['available_zencoins'] ) ? $context['available_zencoins'] : 0, 2 ) ); ?></li>
+					<li><strong><?php esc_html_e( 'Missing ZC:', 'zen-checkout-flow' ); ?></strong> <?php echo esc_html( wc_format_decimal( isset( $context['missing_zencoins'] ) ? $context['missing_zencoins'] : 0, 2 ) ); ?></li>
+					<li><strong><?php esc_html_e( 'Wallet frozen:', 'zen-checkout-flow' ); ?></strong> <?php echo ! empty( $context['wallet_is_frozen'] ) ? esc_html__( 'Yes', 'zen-checkout-flow' ) : esc_html__( 'No', 'zen-checkout-flow' ); ?></li>
+					<?php if ( ! empty( $context['blocking_reason'] ) ) : ?>
+						<li><strong><?php esc_html_e( 'Blocking reason:', 'zen-checkout-flow' ); ?></strong> <?php echo esc_html( $context['blocking_reason'] ); ?></li>
+					<?php endif; ?>
+				</ul>
 			</div>
 			<?php
 			return ob_get_clean();

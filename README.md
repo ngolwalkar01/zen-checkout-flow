@@ -15,6 +15,7 @@ Popup-based WooCommerce cart and checkout shell for logged-in customers.
 - Logged-out visitors see a login-required state.
 - Empty carts show an empty-cart state.
 - AJAX coupon apply/remove refreshes the custom cart and payment panel.
+- Temporary checkout-mode debug panel can surface Coin Booking Bridge cart classification when CBB is active.
 - Back and close buttons trigger JavaScript events so your existing popup can close/navigate:
   - `zenCheckoutFlow:back`
   - `zenCheckoutFlow:close`
