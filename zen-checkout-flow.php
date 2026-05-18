@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Zen Checkout Flow
  * Description: Popup-based WooCommerce checkout/cart flow for logged-in customers.
- * Version: 0.1.3
+ * Version: 0.1.4
  * Author: Custom
  * Text Domain: zen-checkout-flow
  *
@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
 if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 	final class ZCF_Zen_Checkout_Flow {
 
-		const VERSION = '0.1.3';
+		const VERSION = '0.1.4';
 		const NONCE_ACTION = 'zcf_checkout_flow';
 
 		/**
@@ -553,14 +553,15 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			}
 
 			return array(
-				'mode'               => 'money_purchase',
-				'has_booking_items'  => false,
-				'has_credit_products'=> false,
-				'required_zencoins'  => 0,
-				'available_zencoins' => 0,
-				'missing_zencoins'   => 0,
-				'wallet_is_frozen'   => false,
-				'blocking_reason'    => '',
+				'mode'                  => 'money_purchase',
+				'has_booking_items'     => false,
+				'has_credit_products'   => false,
+				'has_recovery_products' => false,
+				'required_zencoins'     => 0,
+				'available_zencoins'    => 0,
+				'missing_zencoins'      => 0,
+				'wallet_is_frozen'      => false,
+				'blocking_reason'       => '',
 			);
 		}
 
@@ -583,6 +584,7 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 					<li><strong><?php esc_html_e( 'Mode:', 'zen-checkout-flow' ); ?></strong> <?php echo esc_html( isset( $context['mode'] ) ? $context['mode'] : 'money_purchase' ); ?></li>
 					<li><strong><?php esc_html_e( 'Has booking items:', 'zen-checkout-flow' ); ?></strong> <?php echo ! empty( $context['has_booking_items'] ) ? esc_html__( 'Yes', 'zen-checkout-flow' ) : esc_html__( 'No', 'zen-checkout-flow' ); ?></li>
 					<li><strong><?php esc_html_e( 'Has credit products:', 'zen-checkout-flow' ); ?></strong> <?php echo ! empty( $context['has_credit_products'] ) ? esc_html__( 'Yes', 'zen-checkout-flow' ) : esc_html__( 'No', 'zen-checkout-flow' ); ?></li>
+					<li><strong><?php esc_html_e( 'Has recovery products:', 'zen-checkout-flow' ); ?></strong> <?php echo ! empty( $context['has_recovery_products'] ) ? esc_html__( 'Yes', 'zen-checkout-flow' ) : esc_html__( 'No', 'zen-checkout-flow' ); ?></li>
 					<li><strong><?php esc_html_e( 'Required ZC:', 'zen-checkout-flow' ); ?></strong> <?php echo esc_html( wc_format_decimal( isset( $context['required_zencoins'] ) ? $context['required_zencoins'] : 0, 2 ) ); ?></li>
 					<li><strong><?php esc_html_e( 'Available ZC:', 'zen-checkout-flow' ); ?></strong> <?php echo esc_html( wc_format_decimal( isset( $context['available_zencoins'] ) ? $context['available_zencoins'] : 0, 2 ) ); ?></li>
 					<li><strong><?php esc_html_e( 'Missing ZC:', 'zen-checkout-flow' ); ?></strong> <?php echo esc_html( wc_format_decimal( isset( $context['missing_zencoins'] ) ? $context['missing_zencoins'] : 0, 2 ) ); ?></li>
