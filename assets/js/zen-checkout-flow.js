@@ -52,6 +52,7 @@
 	function bootNativeCheckout($scope) {
 		var $shell = $scope && $scope.is('[data-zcf-checkout-flow]') ? $scope : $scope.find('[data-zcf-checkout-flow]').first();
 		var $form = $shell.find('form.zcf-native-checkout');
+		var $selectedMethod;
 
 		if (!$form.length) {
 			return;
@@ -66,24 +67,51 @@
 		if (window.wc_checkout_form) {
 			try {
 				window.wc_checkout_form.$checkout_form = $form;
+				$form.attr('novalidate', 'novalidate');
 
-				$form.off('submit.zcfNative').on('submit.zcfNative', function (event) {
+				$form.off('.zcfNative');
+				$form.on('submit.zcfNative', function (event) {
 					return window.wc_checkout_form.submit.call(window.wc_checkout_form, event);
 				});
+				$form.on('click.zcfNative', 'input[name="payment_method"]', window.wc_checkout_form.payment_method_selected);
+				$form.on('input.zcfNative validate.zcfNative change.zcfNative focusout.zcfNative', '.input-text, select, input:checkbox', window.wc_checkout_form.validate_field);
+				$form.on('change.zcfNative', 'select.shipping_method, input[name^="shipping_method"], #ship-to-different-address input, .update_totals_on_change select, .update_totals_on_change input[type="radio"], .update_totals_on_change input[type="checkbox"]', window.wc_checkout_form.trigger_update_checkout);
+				$form.on('change.zcfNative', '.address-field select', window.wc_checkout_form.input_changed);
+				$form.on('change.zcfNative', '.address-field input.input-text, .update_totals_on_change input.input-text', window.wc_checkout_form.maybe_input_changed);
+				$form.on('keydown.zcfNative', '.address-field input.input-text, .update_totals_on_change input.input-text', window.wc_checkout_form.queue_update_checkout);
+				$form.on('blur.zcfNative', '#billing_address_1, #shipping_address_1', window.wc_checkout_form.address_field_blur);
 
 				if (typeof window.wc_checkout_form.init_payment_methods === 'function') {
 					window.wc_checkout_form.init_payment_methods();
 				}
 
-				if (typeof window.wc_checkout_form.init_checkout === 'function') {
-					window.wc_checkout_form.init_checkout();
-				} else {
-					$(document.body).trigger('update_checkout');
+				$selectedMethod = $form.find('input[name="payment_method"]:checked').first();
+
+				if ($selectedMethod.length && typeof window.wc_checkout_form.payment_method_selected === 'function') {
+					window.wc_checkout_form.payment_method_selected.call($selectedMethod.get(0), $.Event('click'));
 				}
+
+				$(document.body).trigger('update_checkout');
 			} catch (error) {
 				// Fall back to basic form submission if native checkout init is unavailable.
 			}
 		}
+	}
+
+	function persistPaymentMethod(paymentMethod) {
+		if (!paymentMethod) {
+			return $.Deferred().resolve().promise();
+		}
+
+		return $.ajax({
+			type: 'POST',
+			url: zcfCheckout.ajaxUrl,
+			data: {
+				action: 'zcf_choose_payment_method',
+				nonce: zcfCheckout.nonce,
+				payment_method: paymentMethod
+			}
+		});
 	}
 
 	function openThemeLoginPopup() {
@@ -265,12 +293,7 @@
 	});
 
 	$(document).on('change', '.zcf-native-checkout input[name="payment_method"]', function () {
-		var $input = $(this);
-		var $shell = $input.closest('[data-zcf-checkout-flow]');
-
-		request($shell, 'zcf_choose_payment_method', {
-			payment_method: $input.val()
-		});
+		persistPaymentMethod($(this).val());
 	});
 
 	$(document).on('click', '[data-zcf-to-payment]', function () {
@@ -304,9 +327,7 @@
 		showCheckoutResult($shell, '', 'success');
 		$form.find('input[name="terms"]').prop('checked', true);
 
-		request($shell, 'zcf_choose_payment_method', {
-			payment_method: paymentMethod
-		}).always(function () {
+		persistPaymentMethod(paymentMethod).always(function () {
 			$form.trigger('submit');
 
 			window.setTimeout(function () {
