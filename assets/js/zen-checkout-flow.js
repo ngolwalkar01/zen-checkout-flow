@@ -98,6 +98,32 @@
 		}
 	}
 
+	function refreshActivePaymentMethod($scope) {
+		var $shell = $scope && $scope.is('[data-zcf-checkout-flow]') ? $scope : $scope.find('[data-zcf-checkout-flow]').first();
+		var $form = $shell.find('form.zcf-native-checkout');
+		var $selectedMethod;
+
+		if (!$form.length || !window.wc_checkout_form || typeof window.wc_checkout_form.payment_method_selected !== 'function') {
+			return;
+		}
+
+		$selectedMethod = $form.find('input[name="payment_method"]:checked').first();
+
+		if (!$selectedMethod.length) {
+			return;
+		}
+
+		window.setTimeout(function () {
+			try {
+				window.wc_checkout_form.$checkout_form = $form;
+				window.wc_checkout_form.payment_method_selected.call($selectedMethod.get(0), $.Event('click'));
+				$(document.body).trigger('wc-credit-card-form-init');
+			} catch (error) {
+				// Keep the popup usable even if a gateway-specific re-init is unavailable.
+			}
+		}, 120);
+	}
+
 	function persistPaymentMethod(paymentMethod) {
 		if (!paymentMethod) {
 			return $.Deferred().resolve().promise();
@@ -347,6 +373,16 @@
 		setLoading($shell, false);
 		$shell.find('[data-zcf-pay]').prop('disabled', false).removeClass('is-loading');
 		showCheckoutResult($shell, errorMessage || zcfCheckout.i18n.error, 'error');
+	});
+
+	$(document.body).on('updated_checkout', function () {
+		var $shell = getPopupStage().find('[data-zcf-checkout-flow]').first();
+
+		if (!$shell.length) {
+			return;
+		}
+
+		refreshActivePaymentMethod($shell);
 	});
 
 	$(document).on('click', '[data-zcf-back]', function () {
