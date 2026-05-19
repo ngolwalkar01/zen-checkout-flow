@@ -113,6 +113,8 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			if ( ! is_admin() && self::dependencies_loaded() ) {
 				wp_enqueue_style( 'zcf-checkout-flow' );
 				wp_enqueue_script( 'zcf-checkout-flow' );
+				wp_enqueue_script( 'wc-checkout' );
+				wp_enqueue_script( 'wc-credit-card-form' );
 			}
 		}
 
@@ -492,13 +494,6 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 		private static function render_payment_panel() {
 			$context            = self::get_checkout_context();
 			$mode               = isset( $context['mode'] ) ? $context['mode'] : 'money_purchase';
-			$available_gateways = WC()->payment_gateways() ? WC()->payment_gateways()->get_available_payment_gateways() : array();
-			$chosen_gateway     = WC()->session ? WC()->session->get( 'chosen_payment_method' ) : '';
-
-			if ( ! $chosen_gateway && $available_gateways ) {
-				$gateway_ids    = array_keys( $available_gateways );
-				$chosen_gateway = reset( $gateway_ids );
-			}
 
 			ob_start();
 			?>
@@ -524,19 +519,7 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 					<?php echo self::render_mode_notice( __( 'Add a qualifying credit product and complete payment first. After credits are granted, the booking flow will be able to continue.', 'zen-checkout-flow' ), 'info' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 				<?php endif; ?>
 
-				<div class="zcf-gateways" data-zcf-gateways>
-					<?php if ( $available_gateways ) : ?>
-						<?php foreach ( $available_gateways as $gateway_id => $gateway ) : ?>
-							<label class="zcf-gateway <?php echo checked( $chosen_gateway, $gateway_id, false ) ? 'is-selected' : ''; ?>">
-								<input type="radio" name="payment_method" value="<?php echo esc_attr( $gateway_id ); ?>" <?php checked( $chosen_gateway, $gateway_id ); ?> />
-								<span><?php echo esc_html( $gateway->get_title() ); ?></span>
-								<em><?php echo wp_kses_post( $gateway->get_icon() ); ?></em>
-							</label>
-						<?php endforeach; ?>
-					<?php else : ?>
-						<div class="zcf-no-gateways"><?php esc_html_e( 'No payment methods are available for this order.', 'zen-checkout-flow' ); ?></div>
-					<?php endif; ?>
-				</div>
+				<?php echo self::render_native_checkout_form(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 			<?php elseif ( 'zencoin_booking' === $mode ) : ?>
 				<?php echo self::render_mode_notice( sprintf( __( 'This booking is covered by your wallet. Required: %1$s ZC. Available: %2$s ZC.', 'zen-checkout-flow' ), wc_format_decimal( isset( $context['required_zencoins'] ) ? $context['required_zencoins'] : 0, 2 ), wc_format_decimal( isset( $context['available_zencoins'] ) ? $context['available_zencoins'] : 0, 2 ) ), 'success' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 				<div class="zcf-payment-label"><?php esc_html_e( 'Payment method:', 'zen-checkout-flow' ); ?></div>
@@ -547,6 +530,68 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 				<div class="zcf-no-gateways"><?php esc_html_e( 'Payment methods stay hidden until a recovery credit product is added to the cart.', 'zen-checkout-flow' ); ?></div>
 			<?php endif; ?>
 			<?php
+			return ob_get_clean();
+		}
+
+		/**
+		 * Render a native WooCommerce checkout form with hidden customer fields.
+		 *
+		 * We keep billing inputs out of sight because the Zen flow is intended to
+		 * reuse customer data captured during signup/account creation.
+		 *
+		 * @return string
+		 */
+		private static function render_native_checkout_form() {
+			if ( ! self::dependencies_loaded() || ! WC()->cart || ! WC()->checkout() ) {
+				return '<div class="zcf-no-gateways">' . esc_html__( 'Checkout is unavailable right now.', 'zen-checkout-flow' ) . '</div>';
+			}
+
+			$checkout = WC()->checkout();
+
+			ob_start();
+			?>
+			<form name="checkout" method="post" class="checkout woocommerce-checkout zcf-native-checkout" action="<?php echo esc_url( wc_get_checkout_url() ); ?>" enctype="multipart/form-data">
+				<div class="zcf-native-checkout__hidden-fields" aria-hidden="true">
+					<?php echo self::render_hidden_customer_fields( $checkout ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+					<input type="hidden" name="ship_to_different_address" value="0" />
+					<input type="hidden" name="_wp_http_referer" value="<?php echo esc_attr( wp_unslash( $_SERVER['REQUEST_URI'] ?? '/' ) ); ?>" />
+				</div>
+
+				<div class="zcf-native-checkout__payment">
+					<?php woocommerce_checkout_payment(); ?>
+				</div>
+			</form>
+			<?php
+			return ob_get_clean();
+		}
+
+		/**
+		 * Render hidden billing fields from the stored customer profile.
+		 *
+		 * @param WC_Checkout $checkout Checkout object.
+		 * @return string
+		 */
+		private static function render_hidden_customer_fields( $checkout ) {
+			$fields = $checkout->get_checkout_fields( 'billing' );
+			$customer_data = self::get_checkout_customer_data();
+
+			if ( empty( $fields ) || ! is_array( $fields ) ) {
+				return '';
+			}
+
+			ob_start();
+
+			foreach ( $fields as $key => $field ) {
+				$value = $checkout->get_value( $key );
+
+				if ( '' === $value && isset( $customer_data[ $key ] ) ) {
+					$value = $customer_data[ $key ];
+				}
+				?>
+				<input type="hidden" name="<?php echo esc_attr( $key ); ?>" value="<?php echo esc_attr( $value ); ?>" />
+				<?php
+			}
+
 			return ob_get_clean();
 		}
 

@@ -17,6 +17,8 @@
 		if (data.payButtonHtml) {
 			$shell.find('[data-zcf-primary-action]').html(data.payButtonHtml);
 		}
+
+		bootNativeCheckout($shell);
 	}
 
 	function showMessage($shell, message, type) {
@@ -45,6 +47,43 @@
 			.removeClass('is-error is-success')
 			.addClass(type === 'success' ? 'is-success' : 'is-error')
 			.html(message || '');
+	}
+
+	function bootNativeCheckout($scope) {
+		var $shell = $scope && $scope.is('[data-zcf-checkout-flow]') ? $scope : $scope.find('[data-zcf-checkout-flow]').first();
+		var $form = $shell.find('form.zcf-native-checkout');
+
+		if (!$form.length) {
+			return;
+		}
+
+		$form.find('input[name="terms"]').prop('checked', true);
+
+		if (!$form.find('input[name="payment_method"]:checked').length) {
+			$form.find('input[name="payment_method"]').first().prop('checked', true).trigger('change');
+		}
+
+		if (window.wc_checkout_form) {
+			try {
+				window.wc_checkout_form.$checkout_form = $form;
+
+				$form.off('submit.zcfNative').on('submit.zcfNative', function (event) {
+					return window.wc_checkout_form.submit.call(window.wc_checkout_form, event);
+				});
+
+				if (typeof window.wc_checkout_form.init_payment_methods === 'function') {
+					window.wc_checkout_form.init_payment_methods();
+				}
+
+				if (typeof window.wc_checkout_form.init_checkout === 'function') {
+					window.wc_checkout_form.init_checkout();
+				} else {
+					$(document.body).trigger('update_checkout');
+				}
+			} catch (error) {
+				// Fall back to basic form submission if native checkout init is unavailable.
+			}
+		}
 	}
 
 	function openThemeLoginPopup() {
@@ -155,6 +194,7 @@
 			.done(function (response) {
 				if (response && response.success && response.data && response.data.html) {
 					$stage.html(response.data.html);
+					bootNativeCheckout($stage);
 					return;
 				}
 
@@ -215,12 +255,9 @@
 		});
 	});
 
-	$(document).on('change', '.zcf-gateway input[name="payment_method"]', function () {
+	$(document).on('change', '.zcf-native-checkout input[name="payment_method"]', function () {
 		var $input = $(this);
 		var $shell = $input.closest('[data-zcf-checkout-flow]');
-
-		$shell.find('.zcf-gateway').removeClass('is-selected');
-		$input.closest('.zcf-gateway').addClass('is-selected');
 
 		request($shell, 'zcf_choose_payment_method', {
 			payment_method: $input.val()
@@ -238,18 +275,12 @@
 
 	$(document).on('click', '[data-zcf-pay]', function () {
 		var $shell = $(this).closest('[data-zcf-checkout-flow]');
-		var paymentMethod = $shell.find('input[name="payment_method"]:checked').val();
+		var $form = $shell.find('form.zcf-native-checkout');
+		var paymentMethod = $form.find('input[name="payment_method"]:checked').val();
 		var $button = $(this);
 		var originalText = $button.text();
-		var checkoutUrl = zcfCheckout.checkoutAjaxUrl;
-		var data = $.extend({}, zcfCheckout.customer || {}, {
-			'payment_method': paymentMethod || '',
-			'terms': '1',
-			'woocommerce-process-checkout-nonce': zcfCheckout.checkoutNonce,
-			'_wp_http_referer': window.location.pathname
-		});
 
-		if (!checkoutUrl) {
+		if (!$form.length) {
 			showCheckoutResult($shell, zcfCheckout.i18n.error, 'error');
 			return;
 		}
@@ -262,41 +293,30 @@
 		$button.prop('disabled', true).addClass('is-loading').text(zcfCheckout.i18n.processing);
 		setLoading($shell, true);
 		showCheckoutResult($shell, '', 'success');
+		$form.find('input[name="terms"]').prop('checked', true);
 
 		request($shell, 'zcf_choose_payment_method', {
 			payment_method: paymentMethod
 		}).always(function () {
-			$.ajax({
-				type: 'POST',
-				url: checkoutUrl,
-				data: data
-			})
-				.done(function (response) {
-					if (response && response.result === 'success') {
-						if (response.redirect && response.redirect.indexOf('order-received') === -1) {
-							window.location.href = response.redirect;
-							return;
-						}
+			$form.trigger('submit');
 
-						showCheckoutResult(
-							$shell,
-							'Payment complete. Your confirmation will be sent by email. <a href="' + zcfCheckout.myAccountUrl + '">View your account</a>.',
-							'success'
-						);
-						request($shell, 'zcf_refresh_checkout');
-						return;
-					}
-
-					showCheckoutResult($shell, response && response.messages ? response.messages : zcfCheckout.i18n.error, 'error');
-				})
-				.fail(function () {
-					showCheckoutResult($shell, zcfCheckout.i18n.error, 'error');
-				})
-				.always(function () {
-					$button.prop('disabled', false).removeClass('is-loading').text(originalText);
-					setLoading($shell, false);
-				});
+			window.setTimeout(function () {
+				$button.prop('disabled', false).removeClass('is-loading').text(originalText);
+				setLoading($shell, false);
+			}, 1500);
 		});
+	});
+
+	$(document.body).on('checkout_error', function (event, errorMessage) {
+		var $shell = $('[data-zcf-checkout-flow]').first();
+
+		if (!$shell.length) {
+			return;
+		}
+
+		setLoading($shell, false);
+		$shell.find('[data-zcf-pay]').prop('disabled', false).removeClass('is-loading');
+		showCheckoutResult($shell, errorMessage || zcfCheckout.i18n.error, 'error');
 	});
 
 	$(document).on('click', '[data-zcf-back]', function () {

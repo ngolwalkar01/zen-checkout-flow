@@ -473,6 +473,50 @@ body.zcf-popup-open {
 	cursor: pointer;
 }
 
+.zcf-native-checkout__hidden-fields,
+.zcf-native-checkout .woocommerce-terms-and-conditions-wrapper,
+.zcf-native-checkout .place-order button,
+.zcf-native-checkout .place-order .button,
+.zcf-native-checkout .form-row.place-order > noscript {
+	display: none !important;
+}
+
+.zcf-native-checkout .woocommerce-checkout-payment,
+.zcf-native-checkout .payment_box {
+	background: transparent !important;
+}
+
+.zcf-native-checkout .wc_payment_methods {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.zcf-native-checkout .wc_payment_method {
+	margin: 0 0 12px;
+	padding: 12px 14px;
+	border: 1px solid rgba(232, 232, 226, 0.28);
+	border-radius: 10px;
+	background: rgba(255, 255, 255, 0.04);
+}
+
+.zcf-native-checkout .wc_payment_method > label {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	color: var(--zcf-text);
+	font-size: 14px;
+	font-weight: 500;
+	cursor: pointer;
+}
+
+.zcf-native-checkout .wc_payment_method .payment_box {
+	margin-top: 12px;
+	color: var(--zcf-muted);
+	font-size: 14px;
+}
+
 .zcf-summary {
 	display: flex;
 	justify-content: space-between;
