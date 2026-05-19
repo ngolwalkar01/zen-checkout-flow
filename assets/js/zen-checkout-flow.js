@@ -167,9 +167,31 @@
 		return getPopup().find('[data-zcf-popup-stage]');
 	}
 
+	function renderPopupShell($stage) {
+		return $.ajax({
+			type: 'POST',
+			url: zcfCheckout.ajaxUrl,
+			data: {
+				action: 'zcf_render_checkout',
+				nonce: zcfCheckout.nonce
+			}
+		}).done(function (response) {
+			if (response && response.success && response.data && response.data.html) {
+				$stage.html(response.data.html);
+				bootNativeCheckout($stage);
+				return;
+			}
+
+			$stage.html('<div class="zcf-popup-loading">' + zcfCheckout.i18n.error + '</div>');
+		}).fail(function () {
+			$stage.html('<div class="zcf-popup-loading">' + zcfCheckout.i18n.error + '</div>');
+		});
+	}
+
 	function openPopup() {
 		var $popup = getPopup();
 		var $stage = getPopupStage();
+		var hasShell;
 
 		if (!$popup.length || !$stage.length) {
 			return;
@@ -181,28 +203,15 @@
 
 		$popup.addClass('is-active').attr('aria-hidden', 'false');
 		$('body').addClass('zcf-popup-open');
-		$stage.html('<div class="zcf-popup-loading">' + zcfCheckout.i18n.loading + '</div>');
+		hasShell = $stage.find('[data-zcf-checkout-flow]').length > 0;
 
-		$.ajax({
-			type: 'POST',
-			url: zcfCheckout.ajaxUrl,
-			data: {
-				action: 'zcf_render_checkout',
-				nonce: zcfCheckout.nonce
-			}
-		})
-			.done(function (response) {
-				if (response && response.success && response.data && response.data.html) {
-					$stage.html(response.data.html);
-					bootNativeCheckout($stage);
-					return;
-				}
+		if (!hasShell) {
+			$stage.html('<div class="zcf-popup-loading" data-zcf-popup-loading>' + zcfCheckout.i18n.loading + '</div>');
+			renderPopupShell($stage);
+			return;
+		}
 
-				$stage.html('<div class="zcf-popup-loading">' + zcfCheckout.i18n.error + '</div>');
-			})
-			.fail(function () {
-				$stage.html('<div class="zcf-popup-loading">' + zcfCheckout.i18n.error + '</div>');
-			});
+		bootNativeCheckout($stage);
 	}
 
 	function closePopup() {
@@ -354,7 +363,15 @@
 	});
 
 	$(document.body).on('added_to_cart', function () {
+		var $stage = getPopupStage();
+		var $shell;
+
 		openPopup();
+		$shell = $stage.find('[data-zcf-checkout-flow]').first();
+
+		if ($shell.length) {
+			request($shell, 'zcf_refresh_checkout');
+		}
 	});
 
 	$(function () {

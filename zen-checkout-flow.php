@@ -32,6 +32,8 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 
 			add_action( 'wp_enqueue_scripts', array( __CLASS__, 'register_assets' ) );
 			add_action( 'wp_footer', array( __CLASS__, 'render_popup_root' ) );
+			add_filter( 'woocommerce_is_checkout', array( __CLASS__, 'force_checkout_context' ), 20 );
+			add_filter( 'body_class', array( __CLASS__, 'add_checkout_body_class' ), 20 );
 			add_filter( 'woocommerce_add_to_cart_redirect', array( __CLASS__, 'redirect_add_to_cart_to_popup' ), 20, 2 );
 			add_action( 'wp_ajax_zcf_render_checkout', array( __CLASS__, 'ajax_render_checkout' ) );
 			add_action( 'wp_ajax_nopriv_zcf_render_checkout', array( __CLASS__, 'ajax_render_checkout' ) );
@@ -195,10 +197,43 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			<div id="zcf-popup" class="zcf-popup" aria-hidden="true">
 				<div class="zcf-popup-backdrop" data-zcf-popup-close></div>
 				<div class="zcf-popup-stage" data-zcf-popup-stage>
-					<div class="zcf-popup-loading"><?php esc_html_e( 'Loading checkout...', 'zen-checkout-flow' ); ?></div>
+					<div class="zcf-popup-loading" data-zcf-popup-loading><?php esc_html_e( 'Loading checkout...', 'zen-checkout-flow' ); ?></div>
 				</div>
 			</div>
 			<?php
+		}
+
+		/**
+		 * Treat frontend requests as checkout-aware so payment plugins enqueue and
+		 * localize their checkout assets even when the final experience is shown
+		 * inside the popup instead of the native checkout template.
+		 *
+		 * @param bool $is_checkout Current checkout flag.
+		 * @return bool
+		 */
+		public static function force_checkout_context( $is_checkout ) {
+			if ( is_admin() || ! self::dependencies_loaded() ) {
+				return $is_checkout;
+			}
+
+			return true;
+		}
+
+		/**
+		 * Add checkout body classes for payment plugins that key off the page body.
+		 *
+		 * @param array $classes Existing body classes.
+		 * @return array
+		 */
+		public static function add_checkout_body_class( $classes ) {
+			if ( is_admin() || ! self::dependencies_loaded() ) {
+				return $classes;
+			}
+
+			$classes[] = 'woocommerce-checkout';
+			$classes[] = 'zcf-popup-checkout-context';
+
+			return array_unique( $classes );
 		}
 
 		/**
