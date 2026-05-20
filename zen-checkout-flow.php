@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Zen Checkout Flow
  * Description: Popup-based WooCommerce checkout/cart flow for logged-in customers.
- * Version: 0.1.9
+ * Version: 0.1.10
  * Author: Custom
  * Text Domain: zen-checkout-flow
  *
@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
 if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 	final class ZCF_Zen_Checkout_Flow {
 
-		const VERSION = '0.1.9';
+		const VERSION = '0.1.10';
 		const NONCE_ACTION = 'zcf_checkout_flow';
 
 		/**
@@ -103,6 +103,7 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 					'myAccountUrl' => self::dependencies_loaded() ? wc_get_page_permalink( 'myaccount' ) : '',
 					'isLoggedIn'   => is_user_logged_in(),
 					'customer'    => self::get_checkout_customer_data(),
+					'gatewayRuntime' => self::get_gateway_runtime_context(),
 					'i18n'        => array(
 						'loading' => __( 'Updating...', 'zen-checkout-flow' ),
 						'error'   => __( 'Something went wrong. Please try again.', 'zen-checkout-flow' ),
@@ -954,6 +955,43 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 		}
 
 		/**
+		 * Get structured runtime context for popup gateway orchestration.
+		 *
+		 * This is still informational in this phase. It gives us a stable
+		 * contract between the server-side gateway discovery and the future
+		 * native popup payment runtime.
+		 *
+		 * @return array
+		 */
+		private static function get_gateway_runtime_context() {
+			$rows            = self::get_available_gateway_strategy_rows();
+			$primary_gateway = ! empty( $rows ) ? $rows[0] : null;
+			$wcpay_card      = array(
+				'available'   => false,
+				'gateway_id'  => 'woocommerce_payments',
+				'strategy'    => 'inline_sdk',
+				'runtime'     => 'wcpay_blocks_checkout_provider',
+				'ui'          => 'stripe_payment_element',
+				'submission'  => 'store_api_checkout',
+			);
+
+			foreach ( $rows as $row ) {
+				if ( 'woocommerce_payments' === $row['id'] ) {
+					$wcpay_card['available'] = true;
+					break;
+				}
+			}
+
+			return array(
+				'available_gateways'       => $rows,
+				'primary_gateway_id'       => $primary_gateway ? $primary_gateway['id'] : '',
+				'primary_gateway_strategy' => $primary_gateway ? $primary_gateway['strategy'] : '',
+				'embedded_surface'         => true,
+				'wcpay_card'               => $wcpay_card,
+			);
+		}
+
+		/**
 		 * Whether a gateway should be hidden from the popup payment experience.
 		 *
 		 * @param WC_Payment_Gateway|string $gateway Gateway object or ID.
@@ -1019,6 +1057,7 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 		private static function render_checkout_context_debug() {
 			$context = self::get_checkout_context();
 			$gateway_rows = self::get_available_gateway_strategy_rows();
+			$runtime      = self::get_gateway_runtime_context();
 
 			ob_start();
 			?>
@@ -1053,6 +1092,11 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 								?>
 							</li>
 						<?php endforeach; ?>
+					<?php endif; ?>
+					<?php if ( ! empty( $runtime['wcpay_card']['available'] ) ) : ?>
+						<li><strong><?php esc_html_e( 'Native card runtime:', 'zen-checkout-flow' ); ?></strong> <?php echo esc_html( $runtime['wcpay_card']['runtime'] ); ?></li>
+						<li><strong><?php esc_html_e( 'Card UI target:', 'zen-checkout-flow' ); ?></strong> <?php echo esc_html( $runtime['wcpay_card']['ui'] ); ?></li>
+						<li><strong><?php esc_html_e( 'Card submission target:', 'zen-checkout-flow' ); ?></strong> <?php echo esc_html( $runtime['wcpay_card']['submission'] ); ?></li>
 					<?php endif; ?>
 				</ul>
 			</div>
