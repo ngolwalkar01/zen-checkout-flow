@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Zen Checkout Flow
  * Description: Popup-based WooCommerce checkout/cart flow for logged-in customers.
- * Version: 0.1.11
+ * Version: 0.1.12
  * Author: Custom
  * Text Domain: zen-checkout-flow
  *
@@ -14,8 +14,9 @@ defined( 'ABSPATH' ) || exit;
 if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 	final class ZCF_Zen_Checkout_Flow {
 
-		const VERSION = '0.1.11';
+		const VERSION = '0.1.12';
 		const NONCE_ACTION = 'zcf_checkout_flow';
+		private static $native_card_bootstrap_summary = null;
 
 		/**
 		 * Boot hooks.
@@ -923,6 +924,7 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			}
 
 			$summary['assets_enqueued'] = true;
+			self::$native_card_bootstrap_summary = $summary;
 
 			return $summary;
 		}
@@ -933,6 +935,10 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 		 * @return array
 		 */
 		private static function get_native_card_runtime_bootstrap_summary() {
+			if ( is_array( self::$native_card_bootstrap_summary ) ) {
+				return self::$native_card_bootstrap_summary;
+			}
+
 			$summary = array(
 				'available'       => false,
 				'assets_enqueued' => false,
@@ -976,6 +982,8 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 					$summary['data_keys'] = array( 'woocommerce_payments_data', 'paymentMethodData' );
 				}
 			}
+
+			self::$native_card_bootstrap_summary = $summary;
 
 			return $summary;
 		}
