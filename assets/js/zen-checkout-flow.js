@@ -23,16 +23,33 @@
 
 	function probeNativeCardRuntime($shell) {
 		var $root = $shell.find('[data-zcf-native-card-root]');
+		var state = getNativeCardRuntimeState($root);
+
+		if (!state) {
+			return;
+		}
+
+		state.$root
+			.addClass('is-probed')
+			.html('<div class="zcf-native-payment-card__probe">' + state.lines.join('') + '</div>');
+
+		mountNativeCardRuntime(state);
+	}
+
+	function getNativeCardRuntimeState($root) {
 		var runtime = zcfCheckout.gatewayRuntime && zcfCheckout.gatewayRuntime.wcpay_card ? zcfCheckout.gatewayRuntime.wcpay_card : null;
 		var bootstrap = zcfCheckout.nativeCardBootstrap || {};
 		var hasWcSettings = !!(window.wc && window.wc.wcSettings && typeof window.wc.wcSettings.getSetting === 'function');
 		var wcpayData = hasWcSettings ? window.wc.wcSettings.getSetting('woocommerce_payments_data', null) : null;
 		var hasPaymentMethodData = hasWcSettings ? window.wc.wcSettings.getSetting('paymentMethodData', null) : null;
-		var hasBlocksRegistry = !!(window.wc && window.wc.wcBlocksRegistry && typeof window.wc.wcBlocksRegistry.registerPaymentMethod === 'function');
+		var hasBlocksRegistry = !!(window.wc && window.wc.wcBlocksRegistry && typeof window.wc.wcBlocksRegistry.getPaymentMethods === 'function');
+		var paymentMethods = hasBlocksRegistry ? window.wc.wcBlocksRegistry.getPaymentMethods() : null;
+		var cardPaymentMethod = paymentMethods && paymentMethods.woocommerce_payments ? paymentMethods.woocommerce_payments : null;
+		var hasReactDom = !!(window.ReactDOM && typeof window.ReactDOM.createRoot === 'function');
 		var lines = [];
 
 		if (!$root.length || !runtime || !runtime.available) {
-			return;
+			return null;
 		}
 
 		lines.push('<div><strong>Runtime handle:</strong> ' + escapeHtml(runtime.runtime || 'n/a') + '</div>');
@@ -41,10 +58,58 @@
 		lines.push('<div><strong>wcBlocksRegistry available:</strong> ' + (hasBlocksRegistry ? 'Yes' : 'No') + '</div>');
 		lines.push('<div><strong>woocommerce_payments_data:</strong> ' + (wcpayData ? 'Present' : 'Missing') + '</div>');
 		lines.push('<div><strong>paymentMethodData.woocommerce_payments:</strong> ' + (hasPaymentMethodData && hasPaymentMethodData.woocommerce_payments ? 'Present' : 'Missing') + '</div>');
+		lines.push('<div><strong>Registered card method:</strong> ' + (cardPaymentMethod ? 'Present' : 'Missing') + '</div>');
+		lines.push('<div><strong>ReactDOM.createRoot:</strong> ' + (hasReactDom ? 'Available' : 'Missing') + '</div>');
 
-		$root
-			.addClass('is-probed')
-			.html('<div class="zcf-native-payment-card__probe">' + lines.join('') + '</div>');
+		return {
+			$root: $root,
+			runtime: runtime,
+			bootstrap: bootstrap,
+			cardPaymentMethod: cardPaymentMethod,
+			hasReactDom: hasReactDom,
+			lines: lines
+		};
+	}
+
+	function mountNativeCardRuntime(state) {
+		var rootNode;
+		var element;
+
+		if (!state || !state.$root.length || !state.cardPaymentMethod || !state.hasReactDom) {
+			return;
+		}
+
+		rootNode = state.$root.get(0);
+		element = state.cardPaymentMethod.content || null;
+
+		if (!element) {
+			return;
+		}
+
+		try {
+			if (window.wp && window.wp.element && typeof window.wp.element.isValidElement === 'function' && window.wp.element.isValidElement(element) && typeof window.wp.element.cloneElement === 'function') {
+				element = window.wp.element.cloneElement(element);
+			}
+
+			if (!rootNode.__zcfCardReactRoot) {
+				rootNode.innerHTML = '';
+				rootNode.__zcfCardReactRoot = window.ReactDOM.createRoot(rootNode);
+			}
+
+			rootNode.__zcfCardReactRoot.render(element);
+			state.$root.addClass('is-mounted').removeClass('is-probed');
+		} catch (error) {
+			console.error('ZCF native card mount failed.', error);
+			state.$root
+				.addClass('is-probed')
+				.html(
+					'<div class="zcf-native-payment-card__probe">' +
+						state.lines.join('') +
+						'<div><strong>Mount attempt:</strong> Failed</div>' +
+						'<div><strong>Error:</strong> ' + escapeHtml(error && error.message ? error.message : 'Unknown error') + '</div>' +
+					'</div>'
+				);
+		}
 	}
 
 	function escapeHtml(value) {
