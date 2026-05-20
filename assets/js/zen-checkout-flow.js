@@ -6,6 +6,8 @@
 	}
 
 	function updateFragments($shell, data) {
+		parkPersistentCheckoutHost();
+
 		if (data.cartItems) {
 			$shell.find('[data-zcf-cart-items]').html(data.cartItems);
 		}
@@ -18,103 +20,37 @@
 			$shell.find('[data-zcf-primary-action]').html(data.payButtonHtml);
 		}
 
-		probeNativeCardRuntime($shell);
+		attachPersistentCheckoutHost($shell);
 	}
 
-	function probeNativeCardRuntime($shell) {
-		var $root = $shell.find('[data-zcf-native-card-root]');
-		var state = getNativeCardRuntimeState($root);
+	function getPersistentCheckoutHost() {
+		return $('[data-zcf-persistent-checkout-host]').first();
+	}
 
-		if (!state) {
+	function getPersistentCheckoutStash() {
+		return $('[data-zcf-native-host-stash]').first();
+	}
+
+	function parkPersistentCheckoutHost() {
+		var $host = getPersistentCheckoutHost();
+		var $stash = getPersistentCheckoutStash();
+
+		if (!$host.length || !$stash.length) {
 			return;
 		}
 
-		state.$root
-			.addClass('is-probed')
-			.html('<div class="zcf-native-payment-card__probe">' + state.lines.join('') + '</div>');
-
-		mountNativeCardRuntime(state);
+		$stash.append($host);
 	}
 
-	function getNativeCardRuntimeState($root) {
-		var runtime = zcfCheckout.gatewayRuntime && zcfCheckout.gatewayRuntime.wcpay_card ? zcfCheckout.gatewayRuntime.wcpay_card : null;
-		var bootstrap = zcfCheckout.nativeCardBootstrap || {};
-		var hasWcSettings = !!(window.wc && window.wc.wcSettings && typeof window.wc.wcSettings.getSetting === 'function');
-		var wcpayData = hasWcSettings ? window.wc.wcSettings.getSetting('woocommerce_payments_data', null) : null;
-		var hasPaymentMethodData = hasWcSettings ? window.wc.wcSettings.getSetting('paymentMethodData', null) : null;
-		var hasBlocksRegistry = !!(window.wc && window.wc.wcBlocksRegistry && typeof window.wc.wcBlocksRegistry.getPaymentMethods === 'function');
-		var hasBlocksCheckout = !!(window.wc && window.wc.blocksCheckout && typeof window.wc.blocksCheckout === 'object');
-		var blocksCheckoutKeys = hasBlocksCheckout ? Object.keys(window.wc.blocksCheckout) : [];
-		var providerCandidates = hasBlocksCheckout ? blocksCheckoutKeys.filter(function (key) {
-			return /provider|checkout|payment/i.test(key);
-		}) : [];
-		var paymentMethods = hasBlocksRegistry ? window.wc.wcBlocksRegistry.getPaymentMethods() : null;
-		var cardPaymentMethod = paymentMethods && paymentMethods.woocommerce_payments ? paymentMethods.woocommerce_payments : null;
-		var hasReactDom = !!(window.ReactDOM && typeof window.ReactDOM.createRoot === 'function');
-		var lines = [];
+	function attachPersistentCheckoutHost($shell) {
+		var $host = getPersistentCheckoutHost();
+		var $slot = $shell.find('[data-zcf-block-checkout-slot]').first();
 
-		if (!$root.length || !runtime || !runtime.available) {
+		if (!$host.length || !$slot.length) {
 			return null;
 		}
 
-		lines.push('<div><strong>Runtime handle:</strong> ' + escapeHtml(runtime.runtime || 'n/a') + '</div>');
-		lines.push('<div><strong>Assets enqueued:</strong> ' + (bootstrap.assets_enqueued ? 'Yes' : 'No') + '</div>');
-		lines.push('<div><strong>wcSettings available:</strong> ' + (hasWcSettings ? 'Yes' : 'No') + '</div>');
-		lines.push('<div><strong>wcBlocksRegistry available:</strong> ' + (hasBlocksRegistry ? 'Yes' : 'No') + '</div>');
-		lines.push('<div><strong>wc.blocksCheckout available:</strong> ' + (hasBlocksCheckout ? 'Yes' : 'No') + '</div>');
-		lines.push('<div><strong>woocommerce_payments_data:</strong> ' + (wcpayData ? 'Present' : 'Missing') + '</div>');
-		lines.push('<div><strong>paymentMethodData.woocommerce_payments:</strong> ' + (hasPaymentMethodData && hasPaymentMethodData.woocommerce_payments ? 'Present' : 'Missing') + '</div>');
-		lines.push('<div><strong>Registered card method:</strong> ' + (cardPaymentMethod ? 'Present' : 'Missing') + '</div>');
-		lines.push('<div><strong>ReactDOM.createRoot:</strong> ' + (hasReactDom ? 'Available' : 'Missing') + '</div>');
-		lines.push('<div><strong>blocksCheckout exports:</strong> ' + escapeHtml(blocksCheckoutKeys.length ? blocksCheckoutKeys.join(', ') : 'None') + '</div>');
-		lines.push('<div><strong>Provider-like exports:</strong> ' + escapeHtml(providerCandidates.length ? providerCandidates.join(', ') : 'None detected') + '</div>');
-
-		return {
-			$root: $root,
-			runtime: runtime,
-			bootstrap: bootstrap,
-			hasBlocksCheckout: hasBlocksCheckout,
-			blocksCheckoutKeys: blocksCheckoutKeys,
-			providerCandidates: providerCandidates,
-			cardPaymentMethod: cardPaymentMethod,
-			hasReactDom: hasReactDom,
-			lines: lines
-		};
-	}
-
-	function mountNativeCardRuntime(state) {
-		var rootNode;
-		var element;
-
-		if (!state || !state.$root.length) {
-			return;
-		}
-
-		rootNode = state.$root.get(0);
-		element = state.cardPaymentMethod ? state.cardPaymentMethod.content || null : null;
-
-		if (!state.cardPaymentMethod || !state.hasReactDom || !state.hasBlocksCheckout || !element) {
-			return;
-		}
-
-		state.$root
-			.addClass('is-probed')
-			.html(
-				'<div class="zcf-native-payment-card__probe">' +
-					state.lines.join('') +
-					'<div><strong>Mount attempt:</strong> Deferred</div>' +
-					'<div><strong>Status:</strong> Direct registry render is paused because Woo Blocks provider context is required.</div>' +
-				'</div>'
-			);
-	}
-
-	function escapeHtml(value) {
-		return String(value || '')
-			.replace(/&/g, '&amp;')
-			.replace(/</g, '&lt;')
-			.replace(/>/g, '&gt;')
-			.replace(/"/g, '&quot;')
-			.replace(/'/g, '&#039;');
+		$slot.empty().append($host);
 	}
 
 	function showMessage($shell, message, type) {
@@ -223,7 +159,7 @@
 		}).done(function (response) {
 			if (response && response.success && response.data && response.data.html) {
 				$stage.html(response.data.html);
-				probeNativeCardRuntime($stage);
+				attachPersistentCheckoutHost($stage);
 				return;
 			}
 
@@ -256,11 +192,12 @@
 			return;
 		}
 
-		probeNativeCardRuntime($stage);
+		attachPersistentCheckoutHost($stage);
 
 	}
 
 	function closePopup() {
+		parkPersistentCheckoutHost();
 		getPopup().removeClass('is-active').attr('aria-hidden', 'true');
 		$('body').removeClass('zcf-popup-open');
 	}

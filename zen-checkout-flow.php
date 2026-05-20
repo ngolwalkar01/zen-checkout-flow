@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Zen Checkout Flow
  * Description: Popup-based WooCommerce checkout/cart flow for logged-in customers.
- * Version: 0.1.15
+ * Version: 0.1.16
  * Author: Custom
  * Text Domain: zen-checkout-flow
  *
@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
 if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 	final class ZCF_Zen_Checkout_Flow {
 
-		const VERSION = '0.1.15';
+		const VERSION = '0.1.16';
 		const NONCE_ACTION = 'zcf_checkout_flow';
 		private static $native_card_bootstrap_summary = null;
 
@@ -114,6 +114,18 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			);
 
 			if ( ! is_admin() && self::dependencies_loaded() ) {
+				if ( wp_script_is( 'wc-checkout-block-frontend', 'registered' ) ) {
+					wp_enqueue_script( 'wc-checkout-block-frontend' );
+				}
+
+				if ( wp_style_is( 'wc-blocks-style', 'registered' ) ) {
+					wp_enqueue_style( 'wc-blocks-style' );
+				}
+
+				if ( wp_style_is( 'wc-blocks-packages-style', 'registered' ) ) {
+					wp_enqueue_style( 'wc-blocks-packages-style' );
+				}
+
 				wp_enqueue_style( 'zcf-checkout-flow' );
 				wp_enqueue_script( 'zcf-checkout-flow' );
 			}
@@ -197,6 +209,11 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 				<div class="zcf-popup-backdrop" data-zcf-popup-close></div>
 				<div class="zcf-popup-stage" data-zcf-popup-stage>
 					<div class="zcf-popup-loading" data-zcf-popup-loading><?php esc_html_e( 'Loading checkout...', 'zen-checkout-flow' ); ?></div>
+				</div>
+			</div>
+			<div class="zcf-native-host-stash" data-zcf-native-host-stash aria-hidden="true">
+				<div class="zcf-native-host-stash__item" data-zcf-persistent-checkout-host>
+					<?php echo self::render_checkout_block_host_markup(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 				</div>
 			</div>
 			<?php
@@ -601,23 +618,14 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 		 * @return string
 		 */
 		private static function render_native_payment_runtime_shell() {
-			$checkout_block_markup = self::render_checkout_block_host_markup();
-
 			ob_start();
 			?>
 			<div class="zcf-native-payment-runtime" data-zcf-native-payment-runtime>
-				<?php if ( $checkout_block_markup ) : ?>
-					<div class="zcf-block-checkout-host" data-zcf-block-checkout-host>
-						<?php echo $checkout_block_markup; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+				<div class="zcf-block-checkout-host" data-zcf-block-checkout-host>
+					<div class="zcf-block-checkout-host__slot" data-zcf-block-checkout-slot>
+						<div class="zcf-block-checkout-host__loading"><?php esc_html_e( 'Loading payment methods…', 'zen-checkout-flow' ); ?></div>
 					</div>
-				<?php else : ?>
-					<div class="zcf-native-payment-card">
-						<div class="zcf-native-payment-card__title"><?php esc_html_e( 'Payment methods are not ready yet.', 'zen-checkout-flow' ); ?></div>
-						<div class="zcf-native-payment-card__meta">
-							<?php esc_html_e( 'The popup could not render the native checkout block host on this page.', 'zen-checkout-flow' ); ?>
-						</div>
-					</div>
-				<?php endif; ?>
+				</div>
 			</div>
 			<?php
 

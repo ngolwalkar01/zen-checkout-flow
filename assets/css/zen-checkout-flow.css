@@ -399,11 +399,35 @@ body.zcf-popup-open {
 	gap: 14px;
 }
 
+.zcf-native-host-stash {
+	position: absolute;
+	width: 0;
+	height: 0;
+	overflow: hidden;
+	pointer-events: none;
+	opacity: 0;
+}
+
 .zcf-block-checkout-host {
 	border: 1px solid rgba(232, 232, 226, 0.2);
 	border-radius: 12px;
 	background: rgba(255, 255, 255, 0.04);
 	padding: 14px;
+}
+
+.zcf-block-checkout-host__slot {
+	min-height: 220px;
+}
+
+.zcf-block-checkout-host__loading {
+	min-height: 220px;
+	display: grid;
+	place-items: center;
+	border: 1px dashed rgba(232, 232, 226, 0.28);
+	border-radius: 10px;
+	color: var(--zcf-muted);
+	font-size: 14px;
+	text-align: center;
 }
 
 .zcf-block-checkout-host .wp-block-woocommerce-checkout {
