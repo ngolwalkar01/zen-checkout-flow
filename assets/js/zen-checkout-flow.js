@@ -43,6 +43,11 @@
 		var wcpayData = hasWcSettings ? window.wc.wcSettings.getSetting('woocommerce_payments_data', null) : null;
 		var hasPaymentMethodData = hasWcSettings ? window.wc.wcSettings.getSetting('paymentMethodData', null) : null;
 		var hasBlocksRegistry = !!(window.wc && window.wc.wcBlocksRegistry && typeof window.wc.wcBlocksRegistry.getPaymentMethods === 'function');
+		var hasBlocksCheckout = !!(window.wc && window.wc.blocksCheckout && typeof window.wc.blocksCheckout === 'object');
+		var blocksCheckoutKeys = hasBlocksCheckout ? Object.keys(window.wc.blocksCheckout) : [];
+		var providerCandidates = hasBlocksCheckout ? blocksCheckoutKeys.filter(function (key) {
+			return /provider|checkout|payment/i.test(key);
+		}) : [];
 		var paymentMethods = hasBlocksRegistry ? window.wc.wcBlocksRegistry.getPaymentMethods() : null;
 		var cardPaymentMethod = paymentMethods && paymentMethods.woocommerce_payments ? paymentMethods.woocommerce_payments : null;
 		var hasReactDom = !!(window.ReactDOM && typeof window.ReactDOM.createRoot === 'function');
@@ -56,15 +61,21 @@
 		lines.push('<div><strong>Assets enqueued:</strong> ' + (bootstrap.assets_enqueued ? 'Yes' : 'No') + '</div>');
 		lines.push('<div><strong>wcSettings available:</strong> ' + (hasWcSettings ? 'Yes' : 'No') + '</div>');
 		lines.push('<div><strong>wcBlocksRegistry available:</strong> ' + (hasBlocksRegistry ? 'Yes' : 'No') + '</div>');
+		lines.push('<div><strong>wc.blocksCheckout available:</strong> ' + (hasBlocksCheckout ? 'Yes' : 'No') + '</div>');
 		lines.push('<div><strong>woocommerce_payments_data:</strong> ' + (wcpayData ? 'Present' : 'Missing') + '</div>');
 		lines.push('<div><strong>paymentMethodData.woocommerce_payments:</strong> ' + (hasPaymentMethodData && hasPaymentMethodData.woocommerce_payments ? 'Present' : 'Missing') + '</div>');
 		lines.push('<div><strong>Registered card method:</strong> ' + (cardPaymentMethod ? 'Present' : 'Missing') + '</div>');
 		lines.push('<div><strong>ReactDOM.createRoot:</strong> ' + (hasReactDom ? 'Available' : 'Missing') + '</div>');
+		lines.push('<div><strong>blocksCheckout exports:</strong> ' + escapeHtml(blocksCheckoutKeys.length ? blocksCheckoutKeys.join(', ') : 'None') + '</div>');
+		lines.push('<div><strong>Provider-like exports:</strong> ' + escapeHtml(providerCandidates.length ? providerCandidates.join(', ') : 'None detected') + '</div>');
 
 		return {
 			$root: $root,
 			runtime: runtime,
 			bootstrap: bootstrap,
+			hasBlocksCheckout: hasBlocksCheckout,
+			blocksCheckoutKeys: blocksCheckoutKeys,
+			providerCandidates: providerCandidates,
 			cardPaymentMethod: cardPaymentMethod,
 			hasReactDom: hasReactDom,
 			lines: lines
@@ -75,41 +86,26 @@
 		var rootNode;
 		var element;
 
-		if (!state || !state.$root.length || !state.cardPaymentMethod || !state.hasReactDom) {
+		if (!state || !state.$root.length) {
 			return;
 		}
 
 		rootNode = state.$root.get(0);
-		element = state.cardPaymentMethod.content || null;
+		element = state.cardPaymentMethod ? state.cardPaymentMethod.content || null : null;
 
-		if (!element) {
+		if (!state.cardPaymentMethod || !state.hasReactDom || !state.hasBlocksCheckout || !element) {
 			return;
 		}
 
-		try {
-			if (window.wp && window.wp.element && typeof window.wp.element.isValidElement === 'function' && window.wp.element.isValidElement(element) && typeof window.wp.element.cloneElement === 'function') {
-				element = window.wp.element.cloneElement(element);
-			}
-
-			if (!rootNode.__zcfCardReactRoot) {
-				rootNode.innerHTML = '';
-				rootNode.__zcfCardReactRoot = window.ReactDOM.createRoot(rootNode);
-			}
-
-			rootNode.__zcfCardReactRoot.render(element);
-			state.$root.addClass('is-mounted').removeClass('is-probed');
-		} catch (error) {
-			console.error('ZCF native card mount failed.', error);
-			state.$root
-				.addClass('is-probed')
-				.html(
-					'<div class="zcf-native-payment-card__probe">' +
-						state.lines.join('') +
-						'<div><strong>Mount attempt:</strong> Failed</div>' +
-						'<div><strong>Error:</strong> ' + escapeHtml(error && error.message ? error.message : 'Unknown error') + '</div>' +
-					'</div>'
-				);
-		}
+		state.$root
+			.addClass('is-probed')
+			.html(
+				'<div class="zcf-native-payment-card__probe">' +
+					state.lines.join('') +
+					'<div><strong>Mount attempt:</strong> Deferred</div>' +
+					'<div><strong>Status:</strong> Direct registry render is paused because Woo Blocks provider context is required.</div>' +
+				'</div>'
+			);
 	}
 
 	function escapeHtml(value) {
