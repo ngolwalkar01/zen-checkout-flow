@@ -393,6 +393,22 @@ body.zcf-popup-open {
 	background: rgba(74, 71, 65, 0.35);
 }
 
+.zcf-embed-payment {
+	margin-top: 12px;
+	border: 1px solid rgba(232, 232, 226, 0.2);
+	border-radius: 12px;
+	overflow: hidden;
+	background: #ffffff;
+}
+
+.zcf-embed-payment__frame {
+	display: block;
+	width: 100%;
+	min-height: 680px;
+	border: 0;
+	background: #ffffff;
+}
+
 .zcf-panel-date {
 	margin-bottom: 14px;
 	color: var(--zcf-muted);
