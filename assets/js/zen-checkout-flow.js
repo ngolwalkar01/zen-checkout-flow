@@ -17,8 +17,6 @@
 		if (data.payButtonHtml) {
 			$shell.find('[data-zcf-primary-action]').html(data.payButtonHtml);
 		}
-
-		bindPaymentEmbedFrame($shell);
 	}
 
 	function showMessage($shell, message, type) {
@@ -33,72 +31,6 @@
 			.removeClass('is-error is-success')
 			.addClass(type === 'success' ? 'is-success' : 'is-error')
 			.html(message || zcfCheckout.i18n.error);
-	}
-
-	function getPaymentEmbedFrame($scope) {
-		var $shell = $scope && $scope.is('[data-zcf-checkout-flow]') ? $scope : $scope.find('[data-zcf-checkout-flow]').first();
-		return $shell.find('[data-zcf-embed-payment-frame]').first();
-	}
-
-	function syncPaymentEmbedFrameHeight(frame, forcedHeight) {
-		var $frame = $(frame);
-		var nextHeight = forcedHeight || 0;
-
-		if (!nextHeight) {
-			try {
-				if (frame.contentWindow && frame.contentWindow.location.origin === window.location.origin) {
-					var doc = frame.contentWindow.document;
-					nextHeight = Math.max(
-						doc.body ? doc.body.scrollHeight : 0,
-						doc.documentElement ? doc.documentElement.scrollHeight : 0,
-						doc.documentElement ? doc.documentElement.offsetHeight : 0
-					);
-				}
-			} catch (error) {
-				nextHeight = 0;
-			}
-		}
-
-		if (nextHeight) {
-			$frame.height(Math.max(nextHeight + 24, 680));
-		}
-	}
-
-	function maybeFollowPaymentUrl(url) {
-		if (!url) {
-			return;
-		}
-
-		try {
-			var parsed = new URL(url, window.location.origin);
-
-			if (parsed.origin === window.location.origin && parsed.pathname.indexOf('/order-received/') !== -1) {
-				window.location.href = parsed.toString();
-			}
-		} catch (error) {
-			// Ignore malformed URLs coming from child frames.
-		}
-	}
-
-	function bindPaymentEmbedFrame($scope) {
-		var $frame = getPaymentEmbedFrame($scope);
-
-		if (!$frame.length) {
-			return;
-		}
-
-		$frame.off('.zcfPayment');
-		$frame.on('load.zcfPayment', function () {
-			syncPaymentEmbedFrameHeight(this);
-
-			try {
-				if (this.contentWindow) {
-					maybeFollowPaymentUrl(this.contentWindow.location.href);
-				}
-			} catch (error) {
-				// Payment providers may navigate internally; the parent just ignores inaccessible states.
-			}
-		});
 	}
 
 	function openThemeLoginPopup() {
@@ -193,7 +125,6 @@
 		}).done(function (response) {
 			if (response && response.success && response.data && response.data.html) {
 				$stage.html(response.data.html);
-				bindPaymentEmbedFrame($stage);
 				return;
 			}
 
@@ -226,7 +157,6 @@
 			return;
 		}
 
-		bindPaymentEmbedFrame($stage);
 	}
 
 	function closePopup() {
@@ -307,29 +237,6 @@
 		if ($shell.length) {
 			request($shell, 'zcf_refresh_checkout');
 		}
-	});
-
-	$(window).on('message', function (event) {
-		var originalEvent = event.originalEvent;
-		var data = originalEvent ? originalEvent.data : null;
-
-		if (!originalEvent || originalEvent.origin !== window.location.origin || !data || data.type !== 'zcfPaymentFrameState') {
-			return;
-		}
-
-		var $frame = $('[data-zcf-embed-payment-frame]').filter(function () {
-			return this.contentWindow === originalEvent.source;
-		}).first();
-
-		if (!$frame.length) {
-			return;
-		}
-
-		if (data.height) {
-			syncPaymentEmbedFrameHeight($frame.get(0), parseInt(data.height, 10));
-		}
-
-		maybeFollowPaymentUrl(data.url);
 	});
 
 	$(function () {

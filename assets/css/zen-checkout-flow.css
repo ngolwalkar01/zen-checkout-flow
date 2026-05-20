@@ -393,20 +393,58 @@ body.zcf-popup-open {
 	background: rgba(74, 71, 65, 0.35);
 }
 
-.zcf-embed-payment {
+.zcf-native-payment-runtime {
 	margin-top: 12px;
-	border: 1px solid rgba(232, 232, 226, 0.2);
-	border-radius: 12px;
-	overflow: hidden;
-	background: #ffffff;
+	display: grid;
+	gap: 14px;
 }
 
-.zcf-embed-payment__frame {
-	display: block;
-	width: 100%;
-	min-height: 680px;
-	border: 0;
-	background: #ffffff;
+.zcf-native-payment-card,
+.zcf-native-payment-redirects {
+	border: 1px solid rgba(232, 232, 226, 0.2);
+	border-radius: 12px;
+	background: rgba(255, 255, 255, 0.04);
+	padding: 14px;
+}
+
+.zcf-native-payment-card__title,
+.zcf-native-payment-redirects__title {
+	font-size: 16px;
+	font-weight: 600;
+	margin-bottom: 10px;
+}
+
+.zcf-native-payment-card__mount {
+	min-height: 220px;
+	border: 1px dashed rgba(232, 232, 226, 0.28);
+	border-radius: 10px;
+	background: rgba(255, 255, 255, 0.03);
+}
+
+.zcf-native-payment-card__meta {
+	margin-top: 10px;
+	color: var(--zcf-muted);
+	font-size: 13px;
+	line-height: 1.4;
+}
+
+.zcf-native-payment-redirects__list {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	display: grid;
+	gap: 10px;
+}
+
+.zcf-native-payment-redirects__list li {
+	display: grid;
+	gap: 4px;
+	font-size: 14px;
+}
+
+.zcf-native-payment-redirects__list span {
+	color: var(--zcf-muted);
+	font-size: 13px;
 }
 
 .zcf-panel-date {
