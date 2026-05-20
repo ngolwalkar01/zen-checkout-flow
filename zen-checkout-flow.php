@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Zen Checkout Flow
  * Description: Popup-based WooCommerce checkout/cart flow for logged-in customers.
- * Version: 0.1.7
+ * Version: 0.1.6
  * Author: Custom
  * Text Domain: zen-checkout-flow
  *
@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
 if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 	final class ZCF_Zen_Checkout_Flow {
 
-		const VERSION = '0.1.7';
+		const VERSION = '0.1.6';
 		const NONCE_ACTION = 'zcf_checkout_flow';
 
 		/**
@@ -31,8 +31,9 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			add_shortcode( 'zen_checkout_flow', array( __CLASS__, 'render_shortcode' ) );
 
 			add_action( 'wp_enqueue_scripts', array( __CLASS__, 'register_assets' ) );
-			add_action( 'template_redirect', array( __CLASS__, 'maybe_render_embedded_checkout_page' ), 1 );
 			add_action( 'wp_footer', array( __CLASS__, 'render_popup_root' ) );
+			add_filter( 'woocommerce_is_checkout', array( __CLASS__, 'force_checkout_context' ), 20 );
+			add_filter( 'body_class', array( __CLASS__, 'add_checkout_body_class' ), 20 );
 			add_filter( 'woocommerce_add_to_cart_redirect', array( __CLASS__, 'redirect_add_to_cart_to_popup' ), 20, 2 );
 			add_action( 'wp_ajax_zcf_render_checkout', array( __CLASS__, 'ajax_render_checkout' ) );
 			add_action( 'wp_ajax_nopriv_zcf_render_checkout', array( __CLASS__, 'ajax_render_checkout' ) );
@@ -98,6 +99,8 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 					'checkoutUrl' => self::dependencies_loaded() ? wc_get_checkout_url() : '',
 					'cartUrl'     => self::dependencies_loaded() ? wc_get_cart_url() : '',
 					'autoOpen'    => self::should_auto_open_popup(),
+					'checkoutAjaxUrl' => self::dependencies_loaded() && class_exists( 'WC_AJAX' ) ? WC_AJAX::get_endpoint( 'checkout' ) : '',
+					'checkoutNonce' => wp_create_nonce( 'woocommerce-process_checkout' ),
 					'myAccountUrl' => self::dependencies_loaded() ? wc_get_page_permalink( 'myaccount' ) : '',
 					'isLoggedIn'   => is_user_logged_in(),
 					'customer'    => self::get_checkout_customer_data(),
@@ -112,6 +115,8 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			if ( ! is_admin() && self::dependencies_loaded() ) {
 				wp_enqueue_style( 'zcf-checkout-flow' );
 				wp_enqueue_script( 'zcf-checkout-flow' );
+				wp_enqueue_script( 'wc-checkout' );
+				wp_enqueue_script( 'wc-credit-card-form' );
 			}
 		}
 
@@ -199,115 +204,36 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 		}
 
 		/**
-		 * Render a standalone embedded checkout page inside an iframe request.
-		 */
-		public static function maybe_render_embedded_checkout_page() {
-			if ( is_admin() || ! self::dependencies_loaded() || ! self::is_embedded_checkout_request() ) {
-				return;
-			}
-
-			$markup = self::get_embedded_checkout_markup();
-
-			status_header( 200 );
-			nocache_headers();
-			?>
-			<!doctype html>
-			<html <?php language_attributes(); ?>>
-			<head>
-				<meta charset="<?php bloginfo( 'charset' ); ?>">
-				<meta name="viewport" content="width=device-width, initial-scale=1">
-				<?php wp_head(); ?>
-			</head>
-			<body <?php body_class( array( 'woocommerce-checkout', 'zcf-embedded-checkout' ) ); ?>>
-				<?php wp_body_open(); ?>
-				<div class="zcf-embedded-checkout__wrap">
-					<?php echo $markup; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
-				</div>
-				<script>
-					(function () {
-						function postState() {
-							var body = document.body;
-							var doc = document.documentElement;
-							var height = Math.max(
-								body ? body.scrollHeight : 0,
-								body ? body.offsetHeight : 0,
-								doc ? doc.clientHeight : 0,
-								doc ? doc.scrollHeight : 0,
-								doc ? doc.offsetHeight : 0
-							);
-							window.parent.postMessage(
-								{
-									type: 'zcfEmbedState',
-									height: height,
-									url: window.location.href
-								},
-								window.location.origin
-							);
-						}
-
-						window.addEventListener('load', function () {
-							postState();
-							window.setTimeout(postState, 300);
-							window.setTimeout(postState, 900);
-						});
-
-						window.addEventListener('resize', postState);
-
-						document.body.addEventListener('click', function () {
-							window.setTimeout(postState, 200);
-							window.setTimeout(postState, 700);
-						});
-					})();
-				</script>
-				<?php wp_footer(); ?>
-			</body>
-			</html>
-			<?php
-			exit;
-		}
-
-		/**
-		 * Whether the current request is for the embedded checkout iframe.
+		 * Treat frontend requests as checkout-aware so payment plugins enqueue and
+		 * localize their checkout assets even when the final experience is shown
+		 * inside the popup instead of the native checkout template.
 		 *
+		 * @param bool $is_checkout Current checkout flag.
 		 * @return bool
 		 */
-		private static function is_embedded_checkout_request() {
-			return isset( $_GET['zcf_embed_checkout'] ) && '1' === wc_clean( wp_unslash( $_GET['zcf_embed_checkout'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		public static function force_checkout_context( $is_checkout ) {
+			if ( is_admin() || ! self::dependencies_loaded() ) {
+				return $is_checkout;
+			}
+
+			return true;
 		}
 
 		/**
-		 * Get checkout markup for the embedded checkout iframe.
+		 * Add checkout body classes for payment plugins that key off the page body.
 		 *
-		 * @return string
+		 * @param array $classes Existing body classes.
+		 * @return array
 		 */
-		private static function get_embedded_checkout_markup() {
-			ob_start();
-
-			if ( have_posts() ) {
-				while ( have_posts() ) {
-					the_post();
-					the_content();
-				}
-
-				wp_reset_postdata();
-
-				return ob_get_clean();
+		public static function add_checkout_body_class( $classes ) {
+			if ( is_admin() || ! self::dependencies_loaded() ) {
+				return $classes;
 			}
 
-			$checkout_page_id = wc_get_page_id( 'checkout' );
-			if ( $checkout_page_id > 0 ) {
-				$checkout_post = get_post( $checkout_page_id );
+			$classes[] = 'woocommerce-checkout';
+			$classes[] = 'zcf-popup-checkout-context';
 
-				if ( $checkout_post instanceof WP_Post ) {
-					echo apply_filters( 'the_content', $checkout_post->post_content ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
-
-					return ob_get_clean();
-				}
-			}
-
-			echo do_shortcode( '[woocommerce_checkout]' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
-
-			return ob_get_clean();
+			return array_unique( $classes );
 		}
 
 		/**
@@ -353,9 +279,6 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 				return self::render_empty_cart();
 			}
 
-			$context    = self::get_checkout_context();
-			$uses_embed = self::uses_embedded_checkout( $context );
-
 			ob_start();
 			?>
 			<div class="zcf-modal" role="dialog" aria-modal="true" aria-label="<?php echo esc_attr__( 'Checkout', 'zen-checkout-flow' ); ?>">
@@ -381,16 +304,14 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 							<?php echo self::render_payment_panel(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 						</div>
 
-						<?php if ( ! $uses_embed ) : ?>
-							<p class="zcf-terms">
-								<?php esc_html_e( 'By completing this purchase, you agree to the', 'zen-checkout-flow' ); ?>
-								<a href="<?php echo esc_url( wc_get_page_permalink( 'terms' ) ); ?>"><?php esc_html_e( 'terms and conditions.', 'zen-checkout-flow' ); ?></a>
-							</p>
+						<p class="zcf-terms">
+							<?php esc_html_e( 'By completing this purchase, you agree to the', 'zen-checkout-flow' ); ?>
+							<a href="<?php echo esc_url( wc_get_page_permalink( 'terms' ) ); ?>"><?php esc_html_e( 'terms and conditions.', 'zen-checkout-flow' ); ?></a>
+						</p>
 
-							<div data-zcf-primary-action>
-								<?php echo self::render_primary_action(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
-							</div>
-						<?php endif; ?>
+						<div data-zcf-primary-action>
+							<?php echo self::render_primary_action(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+						</div>
 						<div class="zcf-checkout-result" data-zcf-checkout-result aria-live="polite"></div>
 					</section>
 				</div>
@@ -620,19 +541,20 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			</div>
 
 			<?php if ( in_array( $mode, array( 'money_purchase', 'mixed_recovery' ), true ) ) : ?>
+				<form class="zcf-coupon" data-zcf-coupon>
+					<input type="text" name="coupon_code" placeholder="<?php echo esc_attr__( 'Discount Code', 'zen-checkout-flow' ); ?>" autocomplete="off" />
+					<button type="submit"><?php esc_html_e( 'Apply', 'zen-checkout-flow' ); ?></button>
+				</form>
+
+				<?php echo self::render_applied_coupons(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+
+				<div class="zcf-payment-label"><?php esc_html_e( 'Payment method:', 'zen-checkout-flow' ); ?></div>
+
 				<?php if ( 'mixed_recovery' === $mode ) : ?>
-					<?php echo self::render_mode_notice( __( 'Complete payment for the recovery product first. The booking will use the granted Zencoins immediately after payment succeeds.', 'zen-checkout-flow' ), 'info' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+					<?php echo self::render_mode_notice( __( 'Add a qualifying credit product and complete payment first. After credits are granted, the booking flow will be able to continue.', 'zen-checkout-flow' ), 'info' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 				<?php endif; ?>
 
-				<div class="zcf-embed-checkout" data-zcf-embed-checkout>
-					<iframe
-						class="zcf-embed-checkout__frame"
-						data-zcf-embed-frame
-						src="<?php echo esc_url( self::get_embedded_checkout_url() ); ?>"
-						title="<?php echo esc_attr__( 'Embedded checkout', 'zen-checkout-flow' ); ?>"
-						loading="eager"
-					></iframe>
-				</div>
+				<?php echo self::render_native_checkout_form(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 			<?php elseif ( 'zencoin_booking' === $mode ) : ?>
 				<?php echo self::render_mode_notice( sprintf( __( 'This booking is covered by your wallet. Required: %1$s ZC. Available: %2$s ZC.', 'zen-checkout-flow' ), wc_format_decimal( isset( $context['required_zencoins'] ) ? $context['required_zencoins'] : 0, 2 ), wc_format_decimal( isset( $context['available_zencoins'] ) ? $context['available_zencoins'] : 0, 2 ) ), 'success' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 				<div class="zcf-payment-label"><?php esc_html_e( 'Payment method:', 'zen-checkout-flow' ); ?></div>
@@ -647,6 +569,68 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 		}
 
 		/**
+		 * Render a native WooCommerce checkout form with hidden customer fields.
+		 *
+		 * We keep billing inputs out of sight because the Zen flow is intended to
+		 * reuse customer data captured during signup/account creation.
+		 *
+		 * @return string
+		 */
+		private static function render_native_checkout_form() {
+			if ( ! self::dependencies_loaded() || ! WC()->cart || ! WC()->checkout() ) {
+				return '<div class="zcf-no-gateways">' . esc_html__( 'Checkout is unavailable right now.', 'zen-checkout-flow' ) . '</div>';
+			}
+
+			$checkout = WC()->checkout();
+
+			ob_start();
+			?>
+			<form name="checkout" method="post" class="checkout woocommerce-checkout zcf-native-checkout" action="<?php echo esc_url( wc_get_checkout_url() ); ?>" enctype="multipart/form-data">
+				<div class="zcf-native-checkout__hidden-fields" aria-hidden="true">
+					<?php echo self::render_hidden_customer_fields( $checkout ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+					<input type="hidden" name="ship_to_different_address" value="0" />
+					<input type="hidden" name="_wp_http_referer" value="<?php echo esc_attr( wp_unslash( $_SERVER['REQUEST_URI'] ?? '/' ) ); ?>" />
+				</div>
+
+				<div class="zcf-native-checkout__payment">
+					<?php woocommerce_checkout_payment(); ?>
+				</div>
+			</form>
+			<?php
+			return ob_get_clean();
+		}
+
+		/**
+		 * Render hidden billing fields from the stored customer profile.
+		 *
+		 * @param WC_Checkout $checkout Checkout object.
+		 * @return string
+		 */
+		private static function render_hidden_customer_fields( $checkout ) {
+			$fields        = $checkout->get_checkout_fields( 'billing' );
+			$customer_data = self::get_checkout_customer_data();
+
+			if ( empty( $fields ) || ! is_array( $fields ) ) {
+				return '';
+			}
+
+			ob_start();
+
+			foreach ( $fields as $key => $field ) {
+				$value = $checkout->get_value( $key );
+
+				if ( '' === $value && isset( $customer_data[ $key ] ) ) {
+					$value = $customer_data[ $key ];
+				}
+				?>
+				<input type="hidden" name="<?php echo esc_attr( $key ); ?>" value="<?php echo esc_attr( $value ); ?>" />
+				<?php
+			}
+
+			return ob_get_clean();
+		}
+
+		/**
 		 * Render the primary checkout action button for the current mode.
 		 *
 		 * @return string
@@ -657,7 +641,19 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 
 			ob_start();
 
-			if ( 'zencoin_booking' === $mode ) :
+			if ( in_array( $mode, array( 'money_purchase', 'mixed_recovery' ), true ) ) :
+				?>
+				<button type="button" class="zcf-pay-button" data-zcf-pay>
+					<?php
+					printf(
+						/* translators: %s: cart total */
+						esc_html__( 'Pay %s', 'zen-checkout-flow' ),
+						wp_kses_post( WC()->cart->get_total() )
+					);
+					?>
+				</button>
+				<?php
+			elseif ( 'zencoin_booking' === $mode ) :
 				?>
 				<button type="button" class="zcf-pay-button is-disabled" disabled>
 					<?php esc_html_e( 'Book with Zencoins', 'zen-checkout-flow' ); ?>
@@ -672,32 +668,6 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			endif;
 
 			return ob_get_clean();
-		}
-
-		/**
-		 * Whether the current checkout mode should use the embedded checkout frame.
-		 *
-		 * @param array $context Checkout context.
-		 * @return bool
-		 */
-		private static function uses_embedded_checkout( $context ) {
-			$mode = isset( $context['mode'] ) ? $context['mode'] : 'money_purchase';
-
-			return in_array( $mode, array( 'money_purchase', 'mixed_recovery' ), true );
-		}
-
-		/**
-		 * Get the embedded checkout URL.
-		 *
-		 * @return string
-		 */
-		private static function get_embedded_checkout_url() {
-			return add_query_arg(
-				array(
-					'zcf_embed_checkout' => '1',
-				),
-				wc_get_checkout_url()
-			);
 		}
 
 		/**
