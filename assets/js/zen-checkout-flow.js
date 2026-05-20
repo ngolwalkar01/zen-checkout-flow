@@ -1,9 +1,6 @@
 (function ($) {
 	'use strict';
 
-	var persistentCheckoutHostObserver = null;
-	var pendingPersistentCheckoutShell = null;
-
 	function setLoading($shell, isLoading) {
 		$shell.toggleClass('is-loading', !!isLoading);
 	}
@@ -34,73 +31,6 @@
 		return $('[data-zcf-native-host-stash]').first();
 	}
 
-	function stopPersistentCheckoutHostObserver() {
-		if (persistentCheckoutHostObserver) {
-			persistentCheckoutHostObserver.disconnect();
-			persistentCheckoutHostObserver = null;
-		}
-	}
-
-	function isPersistentCheckoutHostReady($host) {
-		var hasReadyMarkers;
-		var hasLoadingMarkers;
-
-		if (!$host.length) {
-			return false;
-		}
-
-		hasReadyMarkers = $host.find(
-			'.wc-block-components-radio-control-accordion-option, ' +
-			'.wc-block-components-checkout-place-order-button, ' +
-			'.wc-block-components-payment-method-label'
-		).length > 0;
-
-		hasLoadingMarkers = $host.find(
-			'.is-loading, ' +
-			'[aria-busy="true"], ' +
-			'[class*="skeleton"], ' +
-			'[class*="Skeleton"], ' +
-			'.wc-block-components-loading-mask'
-		).length > 0;
-
-		return hasReadyMarkers && !hasLoadingMarkers;
-	}
-
-	function watchPersistentCheckoutHostUntilReady($shell) {
-		var $host = getPersistentCheckoutHost();
-
-		pendingPersistentCheckoutShell = $shell;
-
-		if (!$host.length || persistentCheckoutHostObserver) {
-			return;
-		}
-
-		persistentCheckoutHostObserver = new MutationObserver(function () {
-			if (!pendingPersistentCheckoutShell || !pendingPersistentCheckoutShell.length) {
-				stopPersistentCheckoutHostObserver();
-				return;
-			}
-
-			if (!getPopup().hasClass('is-active')) {
-				return;
-			}
-
-			if (!isPersistentCheckoutHostReady($host)) {
-				return;
-			}
-
-			stopPersistentCheckoutHostObserver();
-			attachPersistentCheckoutHost(pendingPersistentCheckoutShell);
-		});
-
-		persistentCheckoutHostObserver.observe($host.get(0), {
-			childList: true,
-			subtree: true,
-			attributes: true,
-			attributeFilter: ['class', 'aria-busy']
-		});
-	}
-
 	function parkPersistentCheckoutHost() {
 		var $host = getPersistentCheckoutHost();
 		var $stash = getPersistentCheckoutStash();
@@ -109,8 +39,6 @@
 			return;
 		}
 
-		stopPersistentCheckoutHostObserver();
-		pendingPersistentCheckoutShell = null;
 		$stash.append($host);
 	}
 
@@ -122,13 +50,6 @@
 			return null;
 		}
 
-		if (!isPersistentCheckoutHostReady($host)) {
-			watchPersistentCheckoutHostUntilReady($shell);
-			return null;
-		}
-
-		stopPersistentCheckoutHostObserver();
-		pendingPersistentCheckoutShell = null;
 		$slot.empty().append($host);
 	}
 
