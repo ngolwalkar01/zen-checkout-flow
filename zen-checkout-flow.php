@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Zen Checkout Flow
  * Description: Popup-based WooCommerce checkout/cart flow for logged-in customers.
- * Version: 0.1.8
+ * Version: 0.1.9
  * Author: Custom
  * Text Domain: zen-checkout-flow
  *
@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
 if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 	final class ZCF_Zen_Checkout_Flow {
 
-		const VERSION = '0.1.8';
+		const VERSION = '0.1.9';
 		const NONCE_ACTION = 'zcf_checkout_flow';
 
 		/**
@@ -34,6 +34,7 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			add_action( 'template_redirect', array( __CLASS__, 'maybe_render_embedded_payment_page' ), 1 );
 			add_action( 'wp_footer', array( __CLASS__, 'render_popup_root' ) );
 			add_filter( 'woocommerce_add_to_cart_redirect', array( __CLASS__, 'redirect_add_to_cart_to_popup' ), 20, 2 );
+			add_filter( 'woocommerce_available_payment_gateways', array( __CLASS__, 'filter_popup_payment_gateways' ), 20 );
 			add_action( 'wp_ajax_zcf_render_checkout', array( __CLASS__, 'ajax_render_checkout' ) );
 			add_action( 'wp_ajax_nopriv_zcf_render_checkout', array( __CLASS__, 'ajax_render_checkout' ) );
 			add_action( 'wp_ajax_zcf_refresh_checkout', array( __CLASS__, 'ajax_refresh_checkout' ) );
@@ -329,6 +330,30 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			</html>
 			<?php
 			exit;
+		}
+
+		/**
+		 * Filter out gateways that should never be shown in the popup money-payment flow.
+		 *
+		 * This does not change how the wallet plugin works for Zencoin accounting;
+		 * it only prevents wallet-like gateways from appearing as money payment
+		 * methods inside the embedded popup payment surface.
+		 *
+		 * @param array $gateways Available gateways.
+		 * @return array
+		 */
+		public static function filter_popup_payment_gateways( $gateways ) {
+			if ( ! is_array( $gateways ) || ! self::is_embedded_payment_request() ) {
+				return $gateways;
+			}
+
+			foreach ( $gateways as $gateway_id => $gateway ) {
+				if ( self::should_hide_gateway_in_popup( $gateway ) ) {
+					unset( $gateways[ $gateway_id ] );
+				}
+			}
+
+			return $gateways;
 		}
 
 		/**
@@ -847,6 +872,7 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			return array(
 				'exact'  => array(
 					'woocommerce_payments' => 'inline_sdk',
+					'woocommerce_payments_amazon_pay' => 'redirect_offsite',
 					'woo_wallet'           => 'wallet_internal',
 					'wallet'               => 'wallet_internal',
 					'cod'                  => 'classic_form',
@@ -913,6 +939,10 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			$gateways = WC()->payment_gateways()->get_available_payment_gateways();
 
 			foreach ( $gateways as $gateway_id => $gateway ) {
+				if ( self::should_hide_gateway_in_popup( $gateway ) ) {
+					continue;
+				}
+
 				$rows[] = array(
 					'id'       => (string) $gateway_id,
 					'title'    => is_object( $gateway ) && isset( $gateway->title ) ? wp_strip_all_tags( (string) $gateway->title ) : '',
@@ -921,6 +951,16 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			}
 
 			return $rows;
+		}
+
+		/**
+		 * Whether a gateway should be hidden from the popup payment experience.
+		 *
+		 * @param WC_Payment_Gateway|string $gateway Gateway object or ID.
+		 * @return bool
+		 */
+		private static function should_hide_gateway_in_popup( $gateway ) {
+			return 'wallet_internal' === self::get_gateway_strategy_for_gateway( $gateway );
 		}
 
 		/**
