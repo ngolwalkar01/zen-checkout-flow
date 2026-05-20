@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Zen Checkout Flow
  * Description: Popup-based WooCommerce checkout/cart flow for logged-in customers.
- * Version: 0.1.14
+ * Version: 0.1.15
  * Author: Custom
  * Text Domain: zen-checkout-flow
  *
@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
 if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 	final class ZCF_Zen_Checkout_Flow {
 
-		const VERSION = '0.1.14';
+		const VERSION = '0.1.15';
 		const NONCE_ACTION = 'zcf_checkout_flow';
 		private static $native_card_bootstrap_summary = null;
 
@@ -33,6 +33,7 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 
 			add_action( 'wp_enqueue_scripts', array( __CLASS__, 'register_assets' ) );
 			add_action( 'wp_footer', array( __CLASS__, 'render_popup_root' ) );
+			add_filter( 'woocommerce_available_payment_gateways', array( __CLASS__, 'filter_popup_payment_gateways' ), 50 );
 			add_filter( 'woocommerce_add_to_cart_redirect', array( __CLASS__, 'redirect_add_to_cart_to_popup' ), 20, 2 );
 			add_action( 'wp_ajax_zcf_render_checkout', array( __CLASS__, 'ajax_render_checkout' ) );
 			add_action( 'wp_ajax_nopriv_zcf_render_checkout', array( __CLASS__, 'ajax_render_checkout' ) );
@@ -600,47 +601,138 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 		 * @return string
 		 */
 		private static function render_native_payment_runtime_shell() {
-			$runtime        = self::get_gateway_runtime_context();
-			$gateway_rows   = isset( $runtime['available_gateways'] ) && is_array( $runtime['available_gateways'] ) ? $runtime['available_gateways'] : array();
-			$redirect_rows  = array();
-			$card_available = ! empty( $runtime['wcpay_card']['available'] );
-
-			foreach ( $gateway_rows as $row ) {
-				if ( 'redirect_offsite' === $row['strategy'] ) {
-					$redirect_rows[] = $row;
-				}
-			}
+			$checkout_block_markup = self::render_checkout_block_host_markup();
 
 			ob_start();
 			?>
 			<div class="zcf-native-payment-runtime" data-zcf-native-payment-runtime>
-				<?php if ( $card_available ) : ?>
-					<div class="zcf-native-payment-card" data-zcf-native-card-shell>
-						<div class="zcf-native-payment-card__title"><?php esc_html_e( 'Card', 'zen-checkout-flow' ); ?></div>
-						<div class="zcf-native-payment-card__mount" data-zcf-native-card-root></div>
-						<div class="zcf-native-payment-card__meta">
-							<?php esc_html_e( 'The popup is now loading the real WooPayments card runtime assets and payment data here. The next step is mounting the live Payment Element into this slot.', 'zen-checkout-flow' ); ?>
-						</div>
+				<?php if ( $checkout_block_markup ) : ?>
+					<div class="zcf-block-checkout-host" data-zcf-block-checkout-host>
+						<?php echo $checkout_block_markup; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 					</div>
-				<?php endif; ?>
-
-				<?php if ( ! empty( $redirect_rows ) ) : ?>
-					<div class="zcf-native-payment-redirects">
-						<div class="zcf-native-payment-redirects__title"><?php esc_html_e( 'Other payment methods', 'zen-checkout-flow' ); ?></div>
-						<ul class="zcf-native-payment-redirects__list">
-							<?php foreach ( $redirect_rows as $row ) : ?>
-								<li>
-									<strong><?php echo esc_html( $row['title'] ? $row['title'] : $row['id'] ); ?></strong>
-									<span><?php esc_html_e( 'Redirect-style gateway; it will be wired after Card.', 'zen-checkout-flow' ); ?></span>
-								</li>
-							<?php endforeach; ?>
-						</ul>
+				<?php else : ?>
+					<div class="zcf-native-payment-card">
+						<div class="zcf-native-payment-card__title"><?php esc_html_e( 'Payment methods are not ready yet.', 'zen-checkout-flow' ); ?></div>
+						<div class="zcf-native-payment-card__meta">
+							<?php esc_html_e( 'The popup could not render the native checkout block host on this page.', 'zen-checkout-flow' ); ?>
+						</div>
 					</div>
 				<?php endif; ?>
 			</div>
 			<?php
 
 			return ob_get_clean();
+		}
+
+		/**
+		 * Render a same-DOM checkout block host so payment methods run inside the
+		 * real Woo Blocks provider tree while the popup only exposes the payment
+		 * area visually.
+		 *
+		 * @return string
+		 */
+		private static function render_checkout_block_host_markup() {
+			if ( ! function_exists( 'do_blocks' ) ) {
+				return '';
+			}
+
+			return do_blocks( self::get_checkout_block_stub_markup() );
+		}
+
+		/**
+		 * Get a minimal checkout block document that still gives Woo Blocks the
+		 * full provider tree it expects.
+		 *
+		 * This mirrors WooCommerce's default checkout block structure closely
+		 * enough for native payment runtimes, while the popup CSS hides the
+		 * sections we do not want to expose.
+		 *
+		 * @return string
+		 */
+		private static function get_checkout_block_stub_markup() {
+			return '<!-- wp:woocommerce/checkout -->
+<div class="wp-block-woocommerce-checkout alignwide wc-block-checkout is-loading"><!-- wp:woocommerce/checkout-fields-block -->
+<div class="wp-block-woocommerce-checkout-fields-block"><!-- wp:woocommerce/checkout-express-payment-block -->
+<div class="wp-block-woocommerce-checkout-express-payment-block"></div>
+<!-- /wp:woocommerce/checkout-express-payment-block -->
+
+<!-- wp:woocommerce/checkout-contact-information-block -->
+<div class="wp-block-woocommerce-checkout-contact-information-block"></div>
+<!-- /wp:woocommerce/checkout-contact-information-block -->
+
+<!-- wp:woocommerce/checkout-shipping-method-block -->
+<div class="wp-block-woocommerce-checkout-shipping-method-block"></div>
+<!-- /wp:woocommerce/checkout-shipping-method-block -->
+
+<!-- wp:woocommerce/checkout-pickup-options-block -->
+<div class="wp-block-woocommerce-checkout-pickup-options-block"></div>
+<!-- /wp:woocommerce/checkout-pickup-options-block -->
+
+<!-- wp:woocommerce/checkout-shipping-address-block -->
+<div class="wp-block-woocommerce-checkout-shipping-address-block"></div>
+<!-- /wp:woocommerce/checkout-shipping-address-block -->
+
+<!-- wp:woocommerce/checkout-billing-address-block -->
+<div class="wp-block-woocommerce-checkout-billing-address-block"></div>
+<!-- /wp:woocommerce/checkout-billing-address-block -->
+
+<!-- wp:woocommerce/checkout-shipping-methods-block -->
+<div class="wp-block-woocommerce-checkout-shipping-methods-block"></div>
+<!-- /wp:woocommerce/checkout-shipping-methods-block -->
+
+<!-- wp:woocommerce/checkout-payment-block -->
+<div class="wp-block-woocommerce-checkout-payment-block"></div>
+<!-- /wp:woocommerce/checkout-payment-block -->
+
+<!-- wp:woocommerce/checkout-additional-information-block -->
+<div class="wp-block-woocommerce-checkout-additional-information-block"></div>
+<!-- /wp:woocommerce/checkout-additional-information-block -->
+
+<!-- wp:woocommerce/checkout-order-note-block -->
+<div class="wp-block-woocommerce-checkout-order-note-block"></div>
+<!-- /wp:woocommerce/checkout-order-note-block -->
+
+<!-- wp:woocommerce/checkout-terms-block -->
+<div class="wp-block-woocommerce-checkout-terms-block"></div>
+<!-- /wp:woocommerce/checkout-terms-block -->
+
+<!-- wp:woocommerce/checkout-actions-block -->
+<div class="wp-block-woocommerce-checkout-actions-block"></div>
+<!-- /wp:woocommerce/checkout-actions-block --></div>
+<!-- /wp:woocommerce/checkout-fields-block -->
+
+<!-- wp:woocommerce/checkout-totals-block -->
+<div class="wp-block-woocommerce-checkout-totals-block"><!-- wp:woocommerce/checkout-order-summary-block -->
+<div class="wp-block-woocommerce-checkout-order-summary-block"><!-- wp:woocommerce/checkout-order-summary-cart-items-block -->
+<div class="wp-block-woocommerce-checkout-order-summary-cart-items-block"></div>
+<!-- /wp:woocommerce/checkout-order-summary-cart-items-block -->
+
+<!-- wp:woocommerce/checkout-order-summary-coupon-form-block -->
+<div class="wp-block-woocommerce-checkout-order-summary-coupon-form-block"></div>
+<!-- /wp:woocommerce/checkout-order-summary-coupon-form-block -->
+
+<!-- wp:woocommerce/checkout-order-summary-subtotal-block -->
+<div class="wp-block-woocommerce-checkout-order-summary-subtotal-block"></div>
+<!-- /wp:woocommerce/checkout-order-summary-subtotal-block -->
+
+<!-- wp:woocommerce/checkout-order-summary-fee-block -->
+<div class="wp-block-woocommerce-checkout-order-summary-fee-block"></div>
+<!-- /wp:woocommerce/checkout-order-summary-fee-block -->
+
+<!-- wp:woocommerce/checkout-order-summary-discount-block -->
+<div class="wp-block-woocommerce-checkout-order-summary-discount-block"></div>
+<!-- /wp:woocommerce/checkout-order-summary-discount-block -->
+
+<!-- wp:woocommerce/checkout-order-summary-shipping-block -->
+<div class="wp-block-woocommerce-checkout-order-summary-shipping-block"></div>
+<!-- /wp:woocommerce/checkout-order-summary-shipping-block -->
+
+<!-- wp:woocommerce/checkout-order-summary-taxes-block -->
+<div class="wp-block-woocommerce-checkout-order-summary-taxes-block"></div>
+<!-- /wp:woocommerce/checkout-order-summary-taxes-block --></div>
+<!-- /wp:woocommerce/checkout-order-summary-block --></div>
+<!-- /wp:woocommerce/checkout-totals-block --></div>
+<!-- /wp:woocommerce/checkout -->';
 		}
 
 		/**
@@ -786,6 +878,29 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 		 */
 		private static function should_hide_gateway_in_popup( $gateway ) {
 			return 'wallet_internal' === self::get_gateway_strategy_for_gateway( $gateway );
+		}
+
+		/**
+		 * Remove wallet-style gateways from the available list.
+		 *
+		 * For this project, wallet infrastructure is only used behind the Zencoin
+		 * system and should never be shown as a money checkout option.
+		 *
+		 * @param array $gateways Available gateways.
+		 * @return array
+		 */
+		public static function filter_popup_payment_gateways( $gateways ) {
+			if ( empty( $gateways ) || ! is_array( $gateways ) ) {
+				return $gateways;
+			}
+
+			foreach ( $gateways as $gateway_id => $gateway ) {
+				if ( self::should_hide_gateway_in_popup( $gateway ) ) {
+					unset( $gateways[ $gateway_id ] );
+				}
+			}
+
+			return $gateways;
 		}
 
 		/**

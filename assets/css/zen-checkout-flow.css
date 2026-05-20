@@ -399,6 +399,82 @@ body.zcf-popup-open {
 	gap: 14px;
 }
 
+.zcf-block-checkout-host {
+	border: 1px solid rgba(232, 232, 226, 0.2);
+	border-radius: 12px;
+	background: rgba(255, 255, 255, 0.04);
+	padding: 14px;
+}
+
+.zcf-block-checkout-host .wp-block-woocommerce-checkout {
+	margin: 0;
+	background: transparent;
+	color: var(--zcf-text);
+}
+
+.zcf-block-checkout-host .wp-block-woocommerce-checkout-fields-block,
+.zcf-block-checkout-host .wc-block-components-main {
+	margin: 0;
+	padding: 0;
+	background: transparent;
+}
+
+.zcf-block-checkout-host .wp-block-woocommerce-checkout-express-payment-block,
+.zcf-block-checkout-host .wp-block-woocommerce-checkout-contact-information-block,
+.zcf-block-checkout-host .wp-block-woocommerce-checkout-shipping-method-block,
+.zcf-block-checkout-host .wp-block-woocommerce-checkout-pickup-options-block,
+.zcf-block-checkout-host .wp-block-woocommerce-checkout-shipping-address-block,
+.zcf-block-checkout-host .wp-block-woocommerce-checkout-billing-address-block,
+.zcf-block-checkout-host .wp-block-woocommerce-checkout-shipping-methods-block,
+.zcf-block-checkout-host .wp-block-woocommerce-checkout-additional-information-block,
+.zcf-block-checkout-host .wp-block-woocommerce-checkout-order-note-block,
+.zcf-block-checkout-host .wp-block-woocommerce-checkout-terms-block,
+.zcf-block-checkout-host .wp-block-woocommerce-checkout-totals-block,
+.zcf-block-checkout-host .wc-block-components-sidebar-layout,
+.zcf-block-checkout-host .wc-block-components-sidebar,
+.zcf-block-checkout-host .wp-block-woocommerce-checkout-order-summary-block {
+	display: none !important;
+}
+
+.zcf-block-checkout-host .wp-block-woocommerce-checkout-payment-block,
+.zcf-block-checkout-host .wp-block-woocommerce-checkout-actions-block {
+	display: block !important;
+	margin: 0;
+	padding: 0;
+	background: transparent;
+}
+
+.zcf-block-checkout-host .wc-block-checkout__actions {
+	margin-top: 16px;
+	padding-top: 0;
+	border-top: 0;
+}
+
+.zcf-block-checkout-host .wc-block-components-checkout-place-order-button,
+.zcf-block-checkout-host .wc-block-components-button {
+	min-height: 50px;
+	border-radius: 999px;
+	font-size: 16px;
+	font-weight: 700;
+}
+
+.zcf-block-checkout-host .wc-block-components-radio-control-accordion-option,
+.zcf-block-checkout-host .wc-block-components-panel {
+	border-color: rgba(232, 232, 226, 0.28);
+	background: rgba(255, 255, 255, 0.04);
+	color: var(--zcf-text);
+}
+
+.zcf-block-checkout-host .wc-block-components-payment-method-label,
+.zcf-block-checkout-host .wc-block-components-radio-control__option-layout {
+	color: var(--zcf-text);
+}
+
+.zcf-block-checkout-host .wc-block-components-payment-method-icons,
+.zcf-block-checkout-host .wc-block-components-payment-method-label__description {
+	color: var(--zcf-muted);
+}
+
 .zcf-native-payment-card,
 .zcf-native-payment-redirects {
 	border: 1px solid rgba(232, 232, 226, 0.2);
