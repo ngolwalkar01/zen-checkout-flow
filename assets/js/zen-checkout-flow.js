@@ -1,6 +1,93 @@
 (function ($) {
 	'use strict';
 
+	function getBlocksStores() {
+		var wcBlocksData = window.wc && window.wc.wcBlocksData ? window.wc.wcBlocksData : null;
+
+		if (!wcBlocksData || !window.wp || !window.wp.data) {
+			return null;
+		}
+
+		return {
+			cartStore: wcBlocksData.cartStore,
+			checkoutStore: wcBlocksData.checkoutStore,
+			select: window.wp.data.select,
+			dispatch: window.wp.data.dispatch
+		};
+	}
+
+	function mapCustomerDataToBlocksAddress(customer) {
+		customer = customer || {};
+
+		return {
+			first_name: customer.billing_first_name || '',
+			last_name: customer.billing_last_name || '',
+			company: customer.billing_company || '',
+			address_1: customer.billing_address_1 || '',
+			address_2: customer.billing_address_2 || '',
+			city: customer.billing_city || '',
+			state: customer.billing_state || '',
+			postcode: customer.billing_postcode || '',
+			country: customer.billing_country || '',
+			email: customer.billing_email || '',
+			phone: customer.billing_phone || ''
+		};
+	}
+
+	function mergeMissingAddressFields(current, fallback) {
+		var merged = $.extend({}, current || {});
+
+		$.each(fallback || {}, function (key, value) {
+			if (!merged[key] && value) {
+				merged[key] = value;
+			}
+		});
+
+		return merged;
+	}
+
+	function syncBlocksCustomerData() {
+		var stores = getBlocksStores();
+		var customer = mapCustomerDataToBlocksAddress(zcfCheckout.customer);
+		var cartSelectors;
+		var cartDispatch;
+		var customerData;
+		var billingAddress;
+		var shippingAddress;
+
+		if (!stores || !stores.cartStore || !customer.email) {
+			return;
+		}
+
+		cartSelectors = stores.select(stores.cartStore);
+		cartDispatch = stores.dispatch(stores.cartStore);
+
+		if (!cartSelectors || !cartDispatch || typeof cartDispatch.setBillingAddress !== 'function') {
+			return;
+		}
+
+		customerData = typeof cartSelectors.getCustomerData === 'function' ? cartSelectors.getCustomerData() : {};
+		billingAddress = mergeMissingAddressFields(customerData && customerData.billingAddress, customer);
+		shippingAddress = mergeMissingAddressFields(customerData && customerData.shippingAddress, {
+			first_name: customer.first_name,
+			last_name: customer.last_name,
+			company: customer.company,
+			address_1: customer.address_1,
+			address_2: customer.address_2,
+			city: customer.city,
+			state: customer.state,
+			postcode: customer.postcode,
+			country: customer.country,
+			phone: customer.phone
+		});
+
+		cartDispatch.setBillingAddress(billingAddress);
+
+		if (typeof cartDispatch.setShippingAddress === 'function') {
+			cartDispatch.setShippingAddress(shippingAddress);
+		}
+	}
+
 	function setLoading($shell, isLoading) {
 		$shell.toggleClass('is-loading', !!isLoading);
 	}
@@ -51,6 +138,7 @@
 		}
 
 		$slot.empty().append($host);
+		syncBlocksCustomerData();
 	}
 
 	function showMessage($shell, message, type) {
@@ -278,6 +366,8 @@
 	});
 
 	$(function () {
+		syncBlocksCustomerData();
+
 		if (zcfCheckout.autoOpen) {
 			openPopup();
 		}
