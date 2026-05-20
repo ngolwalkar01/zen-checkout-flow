@@ -17,6 +17,43 @@
 		if (data.payButtonHtml) {
 			$shell.find('[data-zcf-primary-action]').html(data.payButtonHtml);
 		}
+
+		probeNativeCardRuntime($shell);
+	}
+
+	function probeNativeCardRuntime($shell) {
+		var $root = $shell.find('[data-zcf-native-card-root]');
+		var runtime = zcfCheckout.gatewayRuntime && zcfCheckout.gatewayRuntime.wcpay_card ? zcfCheckout.gatewayRuntime.wcpay_card : null;
+		var bootstrap = zcfCheckout.nativeCardBootstrap || {};
+		var hasWcSettings = !!(window.wc && window.wc.wcSettings && typeof window.wc.wcSettings.getSetting === 'function');
+		var wcpayData = hasWcSettings ? window.wc.wcSettings.getSetting('woocommerce_payments_data', null) : null;
+		var hasPaymentMethodData = hasWcSettings ? window.wc.wcSettings.getSetting('paymentMethodData', null) : null;
+		var hasBlocksRegistry = !!(window.wc && window.wc.wcBlocksRegistry && typeof window.wc.wcBlocksRegistry.registerPaymentMethod === 'function');
+		var lines = [];
+
+		if (!$root.length || !runtime || !runtime.available) {
+			return;
+		}
+
+		lines.push('<div><strong>Runtime handle:</strong> ' + escapeHtml(runtime.runtime || 'n/a') + '</div>');
+		lines.push('<div><strong>Assets enqueued:</strong> ' + (bootstrap.assets_enqueued ? 'Yes' : 'No') + '</div>');
+		lines.push('<div><strong>wcSettings available:</strong> ' + (hasWcSettings ? 'Yes' : 'No') + '</div>');
+		lines.push('<div><strong>wcBlocksRegistry available:</strong> ' + (hasBlocksRegistry ? 'Yes' : 'No') + '</div>');
+		lines.push('<div><strong>woocommerce_payments_data:</strong> ' + (wcpayData ? 'Present' : 'Missing') + '</div>');
+		lines.push('<div><strong>paymentMethodData.woocommerce_payments:</strong> ' + (hasPaymentMethodData && hasPaymentMethodData.woocommerce_payments ? 'Present' : 'Missing') + '</div>');
+
+		$root
+			.addClass('is-probed')
+			.html('<div class="zcf-native-payment-card__probe">' + lines.join('') + '</div>');
+	}
+
+	function escapeHtml(value) {
+		return String(value || '')
+			.replace(/&/g, '&amp;')
+			.replace(/</g, '&lt;')
+			.replace(/>/g, '&gt;')
+			.replace(/"/g, '&quot;')
+			.replace(/'/g, '&#039;');
 	}
 
 	function showMessage($shell, message, type) {
@@ -125,6 +162,7 @@
 		}).done(function (response) {
 			if (response && response.success && response.data && response.data.html) {
 				$stage.html(response.data.html);
+				probeNativeCardRuntime($stage);
 				return;
 			}
 
@@ -156,6 +194,8 @@
 			renderPopupShell($stage);
 			return;
 		}
+
+		probeNativeCardRuntime($stage);
 
 	}
 

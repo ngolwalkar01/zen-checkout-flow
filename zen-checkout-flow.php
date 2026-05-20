@@ -72,6 +72,7 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 		 */
 		public static function register_assets() {
 			$base_url = plugin_dir_url( __FILE__ );
+			$native_card_bootstrap = self::prepare_native_card_runtime_assets();
 
 			wp_register_style(
 				'zcf-checkout-flow',
@@ -101,6 +102,7 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 					'isLoggedIn'   => is_user_logged_in(),
 					'customer'    => self::get_checkout_customer_data(),
 					'gatewayRuntime' => self::get_gateway_runtime_context(),
+					'nativeCardBootstrap' => $native_card_bootstrap,
 					'i18n'        => array(
 						'loading' => __( 'Updating...', 'zen-checkout-flow' ),
 						'error'   => __( 'Something went wrong. Please try again.', 'zen-checkout-flow' ),
@@ -616,7 +618,7 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 						<div class="zcf-native-payment-card__title"><?php esc_html_e( 'Card', 'zen-checkout-flow' ); ?></div>
 						<div class="zcf-native-payment-card__mount" data-zcf-native-card-root></div>
 						<div class="zcf-native-payment-card__meta">
-							<?php esc_html_e( 'Native WooPayments card runtime will mount here in the next implementation step.', 'zen-checkout-flow' ); ?>
+							<?php esc_html_e( 'The popup is now loading the real WooPayments card runtime assets and payment data here. The next step is mounting the live Payment Element into this slot.', 'zen-checkout-flow' ); ?>
 						</div>
 					</div>
 				<?php endif; ?>
@@ -746,6 +748,7 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 		private static function get_gateway_runtime_context() {
 			$rows            = self::get_available_gateway_strategy_rows();
 			$primary_gateway = ! empty( $rows ) ? $rows[0] : null;
+			$bootstrap       = self::get_native_card_runtime_bootstrap_summary();
 			$wcpay_card      = array(
 				'available'   => false,
 				'gateway_id'  => 'woocommerce_payments',
@@ -753,6 +756,9 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 				'runtime'     => 'wcpay_blocks_checkout_provider',
 				'ui'          => 'stripe_payment_element',
 				'submission'  => 'store_api_checkout',
+				'assets_ready'  => ! empty( $bootstrap['assets_enqueued'] ),
+				'data_keys'     => ! empty( $bootstrap['data_keys'] ) ? $bootstrap['data_keys'] : array(),
+				'script_handles'=> ! empty( $bootstrap['script_handles'] ) ? $bootstrap['script_handles'] : array(),
 			);
 
 			foreach ( $rows as $row ) {
@@ -835,9 +841,10 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 		 * @return string
 		 */
 		private static function render_checkout_context_debug() {
-			$context = self::get_checkout_context();
+			$context      = self::get_checkout_context();
 			$gateway_rows = self::get_available_gateway_strategy_rows();
 			$runtime      = self::get_gateway_runtime_context();
+			$bootstrap    = self::get_native_card_runtime_bootstrap_summary();
 
 			ob_start();
 			?>
@@ -877,11 +884,100 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 						<li><strong><?php esc_html_e( 'Native card runtime:', 'zen-checkout-flow' ); ?></strong> <?php echo esc_html( $runtime['wcpay_card']['runtime'] ); ?></li>
 						<li><strong><?php esc_html_e( 'Card UI target:', 'zen-checkout-flow' ); ?></strong> <?php echo esc_html( $runtime['wcpay_card']['ui'] ); ?></li>
 						<li><strong><?php esc_html_e( 'Card submission target:', 'zen-checkout-flow' ); ?></strong> <?php echo esc_html( $runtime['wcpay_card']['submission'] ); ?></li>
+						<li><strong><?php esc_html_e( 'Card assets enqueued:', 'zen-checkout-flow' ); ?></strong> <?php echo ! empty( $bootstrap['assets_enqueued'] ) ? esc_html__( 'Yes', 'zen-checkout-flow' ) : esc_html__( 'No', 'zen-checkout-flow' ); ?></li>
+						<?php if ( ! empty( $bootstrap['script_handles'] ) ) : ?>
+							<li><strong><?php esc_html_e( 'Card script handles:', 'zen-checkout-flow' ); ?></strong> <?php echo esc_html( implode( ', ', array_map( 'sanitize_text_field', $bootstrap['script_handles'] ) ) ); ?></li>
+						<?php endif; ?>
+						<?php if ( ! empty( $bootstrap['data_keys'] ) ) : ?>
+							<li><strong><?php esc_html_e( 'Card data keys:', 'zen-checkout-flow' ); ?></strong> <?php echo esc_html( implode( ', ', array_map( 'sanitize_text_field', $bootstrap['data_keys'] ) ) ); ?></li>
+						<?php endif; ?>
 					<?php endif; ?>
 				</ul>
 			</div>
 			<?php
 			return ob_get_clean();
+		}
+
+		/**
+		 * Prepare the native WooPayments Card runtime assets for popup pages.
+		 *
+		 * This is a careful bootstrap step only. We load the real block runtime
+		 * handle and the real data keys onto the page so the popup can truthfully
+		 * probe readiness before we attempt the live Payment Element mount.
+		 *
+		 * @return array
+		 */
+		private static function prepare_native_card_runtime_assets() {
+			$summary = self::get_native_card_runtime_bootstrap_summary();
+
+			if ( empty( $summary['available'] ) || empty( $summary['script_handles'] ) ) {
+				return $summary;
+			}
+
+			wp_enqueue_script( 'wc-settings' );
+
+			foreach ( $summary['script_handles'] as $handle ) {
+				if ( wp_script_is( $handle, 'registered' ) || wp_script_is( $handle, 'enqueued' ) ) {
+					wp_enqueue_script( $handle );
+				}
+			}
+
+			$summary['assets_enqueued'] = true;
+
+			return $summary;
+		}
+
+		/**
+		 * Discover the WooPayments Card block runtime scripts and data keys.
+		 *
+		 * @return array
+		 */
+		private static function get_native_card_runtime_bootstrap_summary() {
+			$summary = array(
+				'available'       => false,
+				'assets_enqueued' => false,
+				'script_handles'  => array(),
+				'data_keys'       => array(),
+			);
+
+			if ( ! class_exists( 'WC_Payments_Blocks_Payment_Method' ) ) {
+				return $summary;
+			}
+
+			$payment_method = new WC_Payments_Blocks_Payment_Method();
+			$payment_method->initialize();
+
+			if ( ! $payment_method->is_active() ) {
+				return $summary;
+			}
+
+			$summary['available']      = true;
+			$summary['script_handles'] = array_values( array_filter( (array) $payment_method->get_payment_method_script_handles() ) );
+
+			if ( class_exists( '\Automattic\WooCommerce\Blocks\Package' ) && class_exists( '\Automattic\WooCommerce\Blocks\Assets\AssetDataRegistry' ) ) {
+				$container = \Automattic\WooCommerce\Blocks\Package::container();
+				$registry  = $container->get( \Automattic\WooCommerce\Blocks\Assets\AssetDataRegistry::class );
+				$data      = $payment_method->get_payment_method_data();
+
+				if ( $registry && is_array( $data ) ) {
+					if ( ! $registry->exists( 'woocommerce_payments_data' ) ) {
+						$registry->add( 'woocommerce_payments_data', $data );
+					}
+
+					if ( ! $registry->exists( 'paymentMethodData' ) ) {
+						$registry->add(
+							'paymentMethodData',
+							array(
+								'woocommerce_payments' => $data,
+							)
+						);
+					}
+
+					$summary['data_keys'] = array( 'woocommerce_payments_data', 'paymentMethodData' );
+				}
+			}
+
+			return $summary;
 		}
 
 		/**
