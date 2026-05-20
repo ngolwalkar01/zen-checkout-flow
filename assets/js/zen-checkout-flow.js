@@ -34,6 +34,30 @@
 		};
 	}
 
+	function normalizeAddressValue(value) {
+		return value == null ? '' : String(value);
+	}
+
+	function addressesDiffer(current, next) {
+		var keys = [
+			'first_name',
+			'last_name',
+			'company',
+			'address_1',
+			'address_2',
+			'city',
+			'state',
+			'postcode',
+			'country',
+			'email',
+			'phone'
+		];
+
+		return keys.some(function (key) {
+			return normalizeAddressValue(current && current[key]) !== normalizeAddressValue(next && next[key]);
+		});
+	}
+
 	function mergeMissingAddressFields(current, fallback) {
 		var merged = $.extend({}, current || {});
 
@@ -54,6 +78,7 @@
 		var customerData;
 		var billingAddress;
 		var shippingAddress;
+		var cartData;
 
 		if (!stores || !stores.cartStore || !customer.email) {
 			return;
@@ -67,23 +92,31 @@
 		}
 
 		customerData = typeof cartSelectors.getCustomerData === 'function' ? cartSelectors.getCustomerData() : {};
+		cartData = typeof cartSelectors.getCartData === 'function' ? cartSelectors.getCartData() : {};
 		billingAddress = mergeMissingAddressFields(customerData && customerData.billingAddress, customer);
 		shippingAddress = mergeMissingAddressFields(customerData && customerData.shippingAddress, {
-			first_name: customer.first_name,
-			last_name: customer.last_name,
-			company: customer.company,
-			address_1: customer.address_1,
-			address_2: customer.address_2,
-			city: customer.city,
-			state: customer.state,
-			postcode: customer.postcode,
-			country: customer.country,
-			phone: customer.phone
+			first_name: customer.billing_first_name || '',
+			last_name: customer.billing_last_name || '',
+			company: customer.billing_company || '',
+			address_1: customer.billing_address_1 || '',
+			address_2: customer.billing_address_2 || '',
+			city: customer.billing_city || '',
+			state: customer.billing_state || '',
+			postcode: customer.billing_postcode || '',
+			country: customer.billing_country || '',
+			phone: customer.billing_phone || ''
 		});
 
-		cartDispatch.setBillingAddress(billingAddress);
+		if (addressesDiffer(customerData && customerData.billingAddress, billingAddress)) {
+			cartDispatch.setBillingAddress(billingAddress);
+		}
 
-		if (typeof cartDispatch.setShippingAddress === 'function') {
+		if (
+			cartData &&
+			cartData.needsShipping &&
+			typeof cartDispatch.setShippingAddress === 'function' &&
+			addressesDiffer(customerData && customerData.shippingAddress, shippingAddress)
+		) {
 			cartDispatch.setShippingAddress(shippingAddress);
 		}
 	}
