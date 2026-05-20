@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Zen Checkout Flow
  * Description: Popup-based WooCommerce checkout/cart flow for logged-in customers.
- * Version: 0.1.7
+ * Version: 0.1.8
  * Author: Custom
  * Text Domain: zen-checkout-flow
  *
@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
 if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 	final class ZCF_Zen_Checkout_Flow {
 
-		const VERSION = '0.1.7';
+		const VERSION = '0.1.8';
 		const NONCE_ACTION = 'zcf_checkout_flow';
 
 		/**
@@ -835,6 +835,95 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 		}
 
 		/**
+		 * Get the gateway strategy registry for the popup checkout architecture.
+		 *
+		 * This is intentionally conservative for now. We are not changing runtime
+		 * behavior yet; this only classifies gateways so we can verify the
+		 * strategy map against the site's real payment methods.
+		 *
+		 * @return array
+		 */
+		private static function get_gateway_strategy_registry() {
+			return array(
+				'exact'  => array(
+					'woocommerce_payments' => 'inline_sdk',
+					'woo_wallet'           => 'wallet_internal',
+					'wallet'               => 'wallet_internal',
+					'cod'                  => 'classic_form',
+					'bacs'                 => 'classic_form',
+					'cheque'               => 'classic_form',
+				),
+				'prefix' => array(
+					'woocommerce_payments_' => 'inline_sdk',
+					'ppcp-'                 => 'redirect_offsite',
+					'ppcp_'                 => 'redirect_offsite',
+					'paypal_'               => 'redirect_offsite',
+				),
+				'contains' => array(
+					'paypal' => 'redirect_offsite',
+					'klarna' => 'inline_sdk',
+					'stripe' => 'inline_sdk',
+					'amazon' => 'redirect_offsite',
+					'wallet' => 'wallet_internal',
+				),
+			);
+		}
+
+		/**
+		 * Classify the strategy for a payment gateway.
+		 *
+		 * @param WC_Payment_Gateway|string $gateway Gateway object or gateway ID.
+		 * @return string
+		 */
+		private static function get_gateway_strategy_for_gateway( $gateway ) {
+			$gateway_id = is_object( $gateway ) && isset( $gateway->id ) ? (string) $gateway->id : (string) $gateway;
+			$gateway_id = strtolower( $gateway_id );
+			$registry   = self::get_gateway_strategy_registry();
+
+			if ( isset( $registry['exact'][ $gateway_id ] ) ) {
+				return $registry['exact'][ $gateway_id ];
+			}
+
+			foreach ( $registry['prefix'] as $prefix => $strategy ) {
+				if ( 0 === strpos( $gateway_id, $prefix ) ) {
+					return $strategy;
+				}
+			}
+
+			foreach ( $registry['contains'] as $needle => $strategy ) {
+				if ( false !== strpos( $gateway_id, $needle ) ) {
+					return $strategy;
+				}
+			}
+
+			return 'classic_unknown';
+		}
+
+		/**
+		 * Get gateway strategy debug rows for currently available gateways.
+		 *
+		 * @return array
+		 */
+		private static function get_available_gateway_strategy_rows() {
+			if ( ! self::dependencies_loaded() || ! WC()->payment_gateways() ) {
+				return array();
+			}
+
+			$rows     = array();
+			$gateways = WC()->payment_gateways()->get_available_payment_gateways();
+
+			foreach ( $gateways as $gateway_id => $gateway ) {
+				$rows[] = array(
+					'id'       => (string) $gateway_id,
+					'title'    => is_object( $gateway ) && isset( $gateway->title ) ? wp_strip_all_tags( (string) $gateway->title ) : '',
+					'strategy' => self::get_gateway_strategy_for_gateway( $gateway ),
+				);
+			}
+
+			return $rows;
+		}
+
+		/**
 		 * Render a mode-specific inline notice.
 		 *
 		 * @param string $message Notice message.
@@ -889,6 +978,7 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 		 */
 		private static function render_checkout_context_debug() {
 			$context = self::get_checkout_context();
+			$gateway_rows = self::get_available_gateway_strategy_rows();
 
 			ob_start();
 			?>
@@ -908,6 +998,21 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 					<li><strong><?php esc_html_e( 'Wallet frozen:', 'zen-checkout-flow' ); ?></strong> <?php echo ! empty( $context['wallet_is_frozen'] ) ? esc_html__( 'Yes', 'zen-checkout-flow' ) : esc_html__( 'No', 'zen-checkout-flow' ); ?></li>
 					<?php if ( ! empty( $context['blocking_reason'] ) ) : ?>
 						<li><strong><?php esc_html_e( 'Blocking reason:', 'zen-checkout-flow' ); ?></strong> <?php echo esc_html( $context['blocking_reason'] ); ?></li>
+					<?php endif; ?>
+					<?php if ( ! empty( $gateway_rows ) ) : ?>
+						<li><strong><?php esc_html_e( 'Gateway strategies:', 'zen-checkout-flow' ); ?></strong></li>
+						<?php foreach ( $gateway_rows as $gateway_row ) : ?>
+							<li>
+								<?php
+								printf(
+									'%1$s (%2$s): %3$s',
+									esc_html( $gateway_row['id'] ),
+									esc_html( $gateway_row['title'] ? $gateway_row['title'] : __( 'Untitled', 'zen-checkout-flow' ) ),
+									esc_html( $gateway_row['strategy'] )
+								);
+								?>
+							</li>
+						<?php endforeach; ?>
 					<?php endif; ?>
 				</ul>
 			</div>
