@@ -400,12 +400,15 @@ body.zcf-popup-open {
 }
 
 .zcf-native-host-stash {
-	position: absolute;
-	width: 0;
-	height: 0;
-	overflow: hidden;
+	position: fixed;
+	left: -200vw;
+	top: 0;
+	width: min(92vw, 1180px);
+	max-width: 1180px;
 	pointer-events: none;
 	opacity: 0;
+	visibility: hidden;
+	z-index: -1;
 }
 
 .zcf-block-checkout-host {
@@ -454,10 +457,13 @@ body.zcf-popup-open {
 .zcf-block-checkout-host .wp-block-woocommerce-checkout-order-note-block,
 .zcf-block-checkout-host .wp-block-woocommerce-checkout-terms-block,
 .zcf-block-checkout-host .wp-block-woocommerce-checkout-totals-block,
-.zcf-block-checkout-host .wc-block-components-sidebar-layout,
 .zcf-block-checkout-host .wc-block-components-sidebar,
 .zcf-block-checkout-host .wp-block-woocommerce-checkout-order-summary-block {
 	display: none !important;
+}
+
+.zcf-block-checkout-host .wc-block-components-sidebar-layout {
+	display: block !important;
 }
 
 .zcf-block-checkout-host .wp-block-woocommerce-checkout-payment-block,
