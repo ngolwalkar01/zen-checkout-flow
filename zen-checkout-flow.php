@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Zen Checkout Flow
  * Description: Popup-based WooCommerce checkout/cart flow for logged-in customers.
- * Version: 0.1.26
+ * Version: 0.1.27
  * Author: Custom
  * Text Domain: zen-checkout-flow
  *
@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
 if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 	final class ZCF_Zen_Checkout_Flow {
 
-		const VERSION = '0.1.26';
+		const VERSION = '0.1.27';
 		const NONCE_ACTION = 'zcf_checkout_flow';
 		private static $native_card_bootstrap_summary = null;
 
@@ -1241,6 +1241,19 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 				if ( wp_script_is( $handle, 'registered' ) || wp_script_is( $handle, 'enqueued' ) ) {
 					wp_enqueue_script( $handle );
 				}
+			}
+
+			// WooPayments only enqueues its checkout block stylesheet on native
+			// Woo pages. Popup pages such as custom landing/pricing pages need the
+			// same stylesheet explicitly so the payment methods render correctly.
+			if ( class_exists( 'WC_Payments_Utils' ) && class_exists( 'WC_Payments' ) && defined( 'WCPAY_PLUGIN_FILE' ) ) {
+				WC_Payments_Utils::enqueue_style(
+					'wc-blocks-checkout-style',
+					plugins_url( 'dist/blocks-checkout.css', WCPAY_PLUGIN_FILE ),
+					array(),
+					WC_Payments::get_file_version( 'dist/checkout.css' ),
+					'all'
+				);
 			}
 
 			$summary['assets_enqueued'] = true;
