@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Zen Checkout Flow
  * Description: Popup-based WooCommerce checkout/cart flow for logged-in customers.
- * Version: 0.1.25
+ * Version: 0.1.26
  * Author: Custom
  * Text Domain: zen-checkout-flow
  *
@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
 if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 	final class ZCF_Zen_Checkout_Flow {
 
-		const VERSION = '0.1.25';
+		const VERSION = '0.1.26';
 		const NONCE_ACTION = 'zcf_checkout_flow';
 		private static $native_card_bootstrap_summary = null;
 
@@ -293,7 +293,6 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 				<div class="zcf-grid">
 					<section class="zcf-left">
 						<?php echo self::render_customer(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
-						<div class="zcf-section-title"><?php esc_html_e( 'Your Produkt:', 'zen-checkout-flow' ); ?></div>
 						<div class="zcf-cart-items" data-zcf-cart-items>
 							<?php echo self::render_cart_items(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 						</div>
@@ -538,44 +537,112 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 		 * @return string
 		 */
 		private static function render_cart_items() {
-			ob_start();
+			$booking_items  = array();
+			$purchase_items = array();
 
 			foreach ( WC()->cart->get_cart() as $cart_item_key => $cart_item ) {
-				$product = $cart_item['data'];
-
-				if ( ! $product || ! $product->exists() ) {
-					continue;
+				if ( self::is_booking_cart_item( $cart_item ) ) {
+					$booking_items[ $cart_item_key ] = $cart_item;
+				} else {
+					$purchase_items[ $cart_item_key ] = $cart_item;
 				}
+			}
 
-				$quantity = max( 1, (int) $cart_item['quantity'] );
+			ob_start();
+
+			if ( ! empty( $booking_items ) ) {
 				?>
-				<article class="zcf-product-card" data-cart-item-key="<?php echo esc_attr( $cart_item_key ); ?>">
-					<div class="zcf-product-main">
-						<div>
-							<h3><?php echo esc_html( $product->get_name() ); ?></h3>
-							<?php echo self::render_product_meta( $cart_item ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
-						</div>
-						<div class="zcf-product-price">
-							<strong><?php echo wp_kses_post( WC()->cart->get_product_subtotal( $product, $quantity ) ); ?></strong>
-							<?php echo self::render_price_suffix( $product ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
-						</div>
+				<div class="zcf-cart-group">
+					<div class="zcf-section-title"><?php esc_html_e( 'Selected class / service:', 'zen-checkout-flow' ); ?></div>
+					<div class="zcf-cart-group__items">
+						<?php foreach ( $booking_items as $cart_item_key => $cart_item ) : ?>
+							<?php echo self::render_cart_item_card( $cart_item_key, $cart_item ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+						<?php endforeach; ?>
 					</div>
+				</div>
+				<?php
+			}
 
-					<button type="button" class="zcf-product-cta" data-zcf-to-payment>
-						<?php esc_html_e( 'To Payment', 'zen-checkout-flow' ); ?>
-					</button>
-
-					<details class="zcf-more">
-						<summary><?php esc_html_e( 'more information', 'zen-checkout-flow' ); ?></summary>
-						<div class="zcf-more-body">
-							<?php echo wp_kses_post( wc_get_formatted_cart_item_data( $cart_item ) ); ?>
-						</div>
-					</details>
-				</article>
+			if ( ! empty( $purchase_items ) ) {
+				?>
+				<div class="zcf-cart-group">
+					<div class="zcf-section-title">
+						<?php echo ! empty( $booking_items ) ? esc_html__( 'Your purchase:', 'zen-checkout-flow' ) : esc_html__( 'Your product:', 'zen-checkout-flow' ); ?>
+					</div>
+					<div class="zcf-cart-group__items">
+						<?php foreach ( $purchase_items as $cart_item_key => $cart_item ) : ?>
+							<?php echo self::render_cart_item_card( $cart_item_key, $cart_item ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+						<?php endforeach; ?>
+					</div>
+				</div>
 				<?php
 			}
 
 			return ob_get_clean();
+		}
+
+		/**
+		 * Render a single cart item card.
+		 *
+		 * @param string $cart_item_key Cart item key.
+		 * @param array  $cart_item     Cart item.
+		 * @return string
+		 */
+		private static function render_cart_item_card( $cart_item_key, $cart_item ) {
+			$product = $cart_item['data'];
+
+			if ( ! $product || ! $product->exists() ) {
+				return '';
+			}
+
+			$quantity = max( 1, (int) $cart_item['quantity'] );
+
+			ob_start();
+			?>
+			<article class="zcf-product-card" data-cart-item-key="<?php echo esc_attr( $cart_item_key ); ?>">
+				<div class="zcf-product-main">
+					<div>
+						<h3><?php echo esc_html( $product->get_name() ); ?></h3>
+						<?php echo self::render_product_meta( $cart_item ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+					</div>
+					<div class="zcf-product-price">
+						<strong><?php echo wp_kses_post( WC()->cart->get_product_subtotal( $product, $quantity ) ); ?></strong>
+						<?php echo self::render_price_suffix( $product ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+					</div>
+				</div>
+
+				<button type="button" class="zcf-product-cta" data-zcf-to-payment>
+					<?php esc_html_e( 'To Payment', 'zen-checkout-flow' ); ?>
+				</button>
+
+				<details class="zcf-more">
+					<summary><?php esc_html_e( 'more information', 'zen-checkout-flow' ); ?></summary>
+					<div class="zcf-more-body">
+						<?php echo wp_kses_post( wc_get_formatted_cart_item_data( $cart_item ) ); ?>
+					</div>
+				</details>
+			</article>
+			<?php
+
+			return ob_get_clean();
+		}
+
+		/**
+		 * Determine whether a cart item is a booking/class-style item.
+		 *
+		 * @param array $cart_item Cart item.
+		 * @return bool
+		 */
+		private static function is_booking_cart_item( $cart_item ) {
+			if ( ! empty( $cart_item['booking'] ) ) {
+				return true;
+			}
+
+			if ( empty( $cart_item['data'] ) || ! is_object( $cart_item['data'] ) ) {
+				return false;
+			}
+
+			return is_callable( array( $cart_item['data'], 'is_type' ) ) && $cart_item['data']->is_type( array( 'booking', 'bookable' ) );
 		}
 
 		/**
@@ -637,7 +704,9 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 
 			ob_start();
 			?>
-			<?php echo self::render_checkout_context_debug(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+			<?php if ( self::should_render_debug() ) : ?>
+				<?php echo self::render_checkout_context_debug(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+			<?php endif; ?>
 			<div class="zcf-panel-date"><?php echo esc_html( date_i18n( get_option( 'date_format' ) ) ); ?></div>
 
 			<div class="zcf-summary">
@@ -693,6 +762,17 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			}
 
 			return ob_get_clean();
+		}
+
+		/**
+		 * Whether developer debug information should be visible.
+		 *
+		 * @return bool
+		 */
+		private static function should_render_debug() {
+			$debug_flag = isset( $_GET['zcf_debug'] ) ? wc_clean( wp_unslash( $_GET['zcf_debug'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+
+			return current_user_can( 'manage_options' ) && '1' === $debug_flag;
 		}
 
 		/**
