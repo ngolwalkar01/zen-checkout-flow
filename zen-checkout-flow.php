@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Zen Checkout Flow
  * Description: Popup-based WooCommerce checkout/cart flow for logged-in customers.
- * Version: 0.1.23
+ * Version: 0.1.25
  * Author: Custom
  * Text Domain: zen-checkout-flow
  *
@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
 if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 	final class ZCF_Zen_Checkout_Flow {
 
-		const VERSION = '0.1.23';
+		const VERSION = '0.1.25';
 		const NONCE_ACTION = 'zcf_checkout_flow';
 		private static $native_card_bootstrap_summary = null;
 
@@ -74,6 +74,9 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 		 */
 		public static function register_assets() {
 			$base_url = plugin_dir_url( __FILE__ );
+
+			self::hydrate_checkout_customer_profile();
+
 			$native_card_bootstrap = self::prepare_native_card_runtime_assets();
 
 			wp_register_style(
@@ -189,18 +192,32 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 				return false;
 			}
 
+			if ( self::is_native_checkout_page() ) {
+				return false;
+			}
+
 			$has_open_flag = isset( $_GET['zcf_open_checkout'] ) && '1' === wc_clean( wp_unslash( $_GET['zcf_open_checkout'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 
 			return ( function_exists( 'is_cart' ) && is_cart() )
-				|| ( function_exists( 'is_checkout' ) && is_checkout() && ( ! function_exists( 'is_order_received_page' ) || ! is_order_received_page() ) )
 				|| $has_open_flag;
+		}
+
+		/**
+		 * Whether we are on the native checkout page where Woo already owns the checkout runtime.
+		 *
+		 * @return bool
+		 */
+		private static function is_native_checkout_page() {
+			return function_exists( 'is_checkout' )
+				&& is_checkout()
+				&& ( ! function_exists( 'is_order_received_page' ) || ! is_order_received_page() );
 		}
 
 		/**
 		 * Render the plugin-owned popup mount point.
 		 */
 		public static function render_popup_root() {
-			if ( is_admin() || ! self::dependencies_loaded() ) {
+			if ( is_admin() || ! self::dependencies_loaded() || self::is_native_checkout_page() ) {
 				return;
 			}
 
@@ -314,31 +331,131 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 		 * @return array
 		 */
 		private static function get_checkout_customer_data() {
-			if ( ! self::dependencies_loaded() || ! is_user_logged_in() || ! WC()->customer ) {
+			if ( ! self::dependencies_loaded() || ! is_user_logged_in() ) {
 				return array();
 			}
 
-			$customer = WC()->customer;
-			$user     = wp_get_current_user();
-			$country  = $customer->get_billing_country();
+			return self::resolve_checkout_customer_profile();
+		}
+
+		/**
+		 * Resolve the checkout profile using user meta first, then Woo customer/session values.
+		 *
+		 * @return array
+		 */
+		private static function resolve_checkout_customer_profile() {
+			$user      = wp_get_current_user();
+			$user_id   = (int) $user->ID;
+			$customer  = ( self::dependencies_loaded() && WC()->customer ) ? WC()->customer : null;
+			$get_value = static function( $meta_key, $customer_getter = '' ) use ( $user_id, $customer ) {
+				$user_meta = $user_id ? (string) get_user_meta( $user_id, $meta_key, true ) : '';
+
+				if ( '' !== trim( $user_meta ) ) {
+					return trim( $user_meta );
+				}
+
+				if ( $customer && $customer_getter && is_callable( array( $customer, $customer_getter ) ) ) {
+					$customer_value = (string) $customer->{$customer_getter}();
+
+					if ( '' !== trim( $customer_value ) ) {
+						return trim( $customer_value );
+					}
+				}
+
+				return '';
+			};
+
+			$country = self::normalize_country_code( $get_value( 'billing_country', 'get_billing_country' ) );
 
 			if ( ! $country && WC()->countries ) {
 				$country = WC()->countries->get_base_country();
 			}
 
 			return array(
-				'billing_first_name' => $customer->get_billing_first_name() ? $customer->get_billing_first_name() : $user->first_name,
-				'billing_last_name'  => $customer->get_billing_last_name() ? $customer->get_billing_last_name() : $user->last_name,
-				'billing_company'    => $customer->get_billing_company(),
+				'billing_first_name' => $get_value( 'billing_first_name', 'get_billing_first_name' ) ?: $user->first_name,
+				'billing_last_name'  => $get_value( 'billing_last_name', 'get_billing_last_name' ) ?: $user->last_name,
+				'billing_company'    => $get_value( 'billing_company', 'get_billing_company' ),
 				'billing_country'    => $country,
-				'billing_address_1'  => $customer->get_billing_address_1(),
-				'billing_address_2'  => $customer->get_billing_address_2(),
-				'billing_city'       => $customer->get_billing_city(),
-				'billing_state'      => $customer->get_billing_state(),
-				'billing_postcode'   => $customer->get_billing_postcode(),
-				'billing_phone'      => $customer->get_billing_phone(),
-				'billing_email'      => $customer->get_billing_email() ? $customer->get_billing_email() : $user->user_email,
+				'billing_address_1'  => $get_value( 'billing_address_1', 'get_billing_address_1' ),
+				'billing_address_2'  => $get_value( 'billing_address_2', 'get_billing_address_2' ),
+				'billing_city'       => $get_value( 'billing_city', 'get_billing_city' ),
+				'billing_state'      => $get_value( 'billing_state', 'get_billing_state' ),
+				'billing_postcode'   => $get_value( 'billing_postcode', 'get_billing_postcode' ),
+				'billing_phone'      => $get_value( 'billing_phone', 'get_billing_phone' ),
+				'billing_email'      => $get_value( 'billing_email', 'get_billing_email' ) ?: $user->user_email,
 			);
+		}
+
+		/**
+		 * Normalize a country value to a WooCommerce country code when possible.
+		 *
+		 * @param string $country Country code or country name.
+		 * @return string
+		 */
+		private static function normalize_country_code( $country ) {
+			$country = trim( (string) $country );
+
+			if ( '' === $country ) {
+				return '';
+			}
+
+			if ( 2 === strlen( $country ) ) {
+				return strtoupper( $country );
+			}
+
+			if ( ! WC()->countries ) {
+				return $country;
+			}
+
+			$countries = WC()->countries->get_countries();
+
+			foreach ( $countries as $country_code => $country_label ) {
+				if ( 0 === strcasecmp( $country_label, $country ) ) {
+					return (string) $country_code;
+				}
+			}
+
+			return $country;
+		}
+
+		/**
+		 * Hydrate the Woo customer/session object from the resolved profile so the
+		 * checkout block receives stable values without relying on stale session data.
+		 *
+		 * @return void
+		 */
+		private static function hydrate_checkout_customer_profile() {
+			if ( ! self::dependencies_loaded() || ! is_user_logged_in() || ! WC()->customer ) {
+				return;
+			}
+
+			$profile = self::resolve_checkout_customer_profile();
+
+			WC()->customer->set_billing_first_name( $profile['billing_first_name'] );
+			WC()->customer->set_billing_last_name( $profile['billing_last_name'] );
+			WC()->customer->set_billing_company( $profile['billing_company'] );
+			WC()->customer->set_billing_country( $profile['billing_country'] );
+			WC()->customer->set_billing_address_1( $profile['billing_address_1'] );
+			WC()->customer->set_billing_address_2( $profile['billing_address_2'] );
+			WC()->customer->set_billing_city( $profile['billing_city'] );
+			WC()->customer->set_billing_state( $profile['billing_state'] );
+			WC()->customer->set_billing_postcode( $profile['billing_postcode'] );
+			WC()->customer->set_billing_phone( $profile['billing_phone'] );
+			WC()->customer->set_billing_email( $profile['billing_email'] );
+
+			if ( ! WC()->cart || ! WC()->cart->needs_shipping() ) {
+				WC()->customer->set_shipping_first_name( $profile['billing_first_name'] );
+				WC()->customer->set_shipping_last_name( $profile['billing_last_name'] );
+				WC()->customer->set_shipping_company( $profile['billing_company'] );
+				WC()->customer->set_shipping_country( $profile['billing_country'] );
+				WC()->customer->set_shipping_address_1( $profile['billing_address_1'] );
+				WC()->customer->set_shipping_address_2( $profile['billing_address_2'] );
+				WC()->customer->set_shipping_city( $profile['billing_city'] );
+				WC()->customer->set_shipping_state( $profile['billing_state'] );
+				WC()->customer->set_shipping_postcode( $profile['billing_postcode'] );
+			}
+
+			WC()->customer->save();
 		}
 
 		/**
