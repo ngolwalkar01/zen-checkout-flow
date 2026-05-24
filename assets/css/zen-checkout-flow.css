@@ -24,7 +24,7 @@ body.zcf-popup-open {
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	padding: 24px;
+	padding: clamp(24px, 3vw, 56px);
 	opacity: 0;
 	visibility: hidden;
 	pointer-events: none;
@@ -48,8 +48,8 @@ body.zcf-popup-open {
 .zcf-popup-stage {
 	position: relative;
 	z-index: 1;
-	width: 100%;
-	max-height: calc(100vh - 48px);
+	width: min(92vw, clamp(1180px, 78vw, 1680px));
+	max-height: calc(100vh - (clamp(24px, 3vw, 56px) * 2));
 	overflow-y: auto;
 	scrollbar-width: thin;
 	scrollbar-color: #e2be52 rgba(30, 30, 30, 0.8);
@@ -113,7 +113,8 @@ body.zcf-popup-open {
 
 .zcf-modal {
 	position: relative;
-	width: min(92vw, 1180px);
+	width: 100%;
+	max-width: none;
 	min-height: auto;
 	margin: 0 auto;
 	padding: 30px 44px 38px;
@@ -216,9 +217,9 @@ body.zcf-popup-open {
 .zcf-grid {
 	display: grid;
 	grid-template-columns: minmax(300px, 0.9fr) minmax(360px, 1fr);
-	gap: 42px;
+	gap: clamp(42px, 3vw, 68px);
 	align-items: start;
-	max-width: 1480px;
+	max-width: none;
 	margin: 0 auto;
 }
 
@@ -412,8 +413,8 @@ body.zcf-popup-open {
 	position: fixed;
 	left: -200vw;
 	top: 0;
-	width: min(92vw, 1180px);
-	max-width: 1180px;
+	width: min(92vw, clamp(1180px, 78vw, 1680px));
+	max-width: none;
 	pointer-events: none;
 	opacity: 0;
 	visibility: hidden;
