@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Zen Checkout Flow
  * Description: Popup-based WooCommerce checkout/cart flow for logged-in customers.
- * Version: 0.1.31
+ * Version: 0.1.32
  * Author: Custom
  * Text Domain: zen-checkout-flow
  *
@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
 if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 	final class ZCF_Zen_Checkout_Flow {
 
-		const VERSION = '0.1.31';
+		const VERSION = '0.1.32';
 		const NONCE_ACTION = 'zcf_checkout_flow';
 		private static $native_card_bootstrap_summary = null;
 
@@ -1874,7 +1874,32 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			}
 
 			self::prepare_zencoin_checkout_post_data();
+			add_filter( 'woocommerce_checkout_fields', array( __CLASS__, 'relax_zencoin_booking_checkout_fields' ), 20 );
 			WC()->checkout()->process_checkout();
+		}
+
+		/**
+		 * Relax billing/shipping required fields for wallet-only booking checkout.
+		 *
+		 * @param array $fields Checkout fields.
+		 * @return array
+		 */
+		public static function relax_zencoin_booking_checkout_fields( $fields ) {
+			foreach ( array( 'billing', 'shipping' ) as $fieldset_key ) {
+				if ( empty( $fields[ $fieldset_key ] ) || ! is_array( $fields[ $fieldset_key ] ) ) {
+					continue;
+				}
+
+				foreach ( $fields[ $fieldset_key ] as $key => $field ) {
+					if ( 'billing_email' === $key ) {
+						continue;
+					}
+
+					$fields[ $fieldset_key ][ $key ]['required'] = false;
+				}
+			}
+
+			return $fields;
 		}
 
 		/**
@@ -1886,11 +1911,11 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			$customer_data = self::get_checkout_customer_data();
 			$checkout      = WC()->checkout();
 
-			$_POST['woocommerce-process-checkout-nonce'] = wp_create_nonce( 'woocommerce-process_checkout' );
-			$_POST['_wpnonce']                          = $_POST['woocommerce-process-checkout-nonce'];
-			$_POST['payment_method']                    = '';
-			$_POST['terms']                             = '1';
-			$_POST['terms-field']                       = '1';
+			self::set_synthetic_checkout_post_value( 'woocommerce-process-checkout-nonce', wp_create_nonce( 'woocommerce-process_checkout' ) );
+			self::set_synthetic_checkout_post_value( '_wpnonce', $_POST['woocommerce-process-checkout-nonce'] );
+			self::set_synthetic_checkout_post_value( 'payment_method', '' );
+			self::set_synthetic_checkout_post_value( 'terms', '1' );
+			self::set_synthetic_checkout_post_value( 'terms-field', '1' );
 
 			foreach ( $checkout->get_checkout_fields() as $fieldset ) {
 				foreach ( $fieldset as $key => $field ) {
@@ -1899,10 +1924,22 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 					}
 
 					if ( isset( $customer_data[ $key ] ) ) {
-						$_POST[ $key ] = $customer_data[ $key ];
+						self::set_synthetic_checkout_post_value( $key, $customer_data[ $key ] );
 					}
 				}
 			}
+		}
+
+		/**
+		 * Set checkout payload values in both POST and REQUEST for Woo internals.
+		 *
+		 * @param string $key   Field key.
+		 * @param mixed  $value Field value.
+		 * @return void
+		 */
+		private static function set_synthetic_checkout_post_value( $key, $value ) {
+			$_POST[ $key ]    = $value;
+			$_REQUEST[ $key ] = $value;
 		}
 
 		/**
