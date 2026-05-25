@@ -1058,6 +1058,70 @@ body.zcf-popup-open {
 	outline: none;
 }
 
+.zcf-success-modal .zcf-grid {
+	align-items: center;
+}
+
+.zcf-success-panel {
+	display: grid;
+	gap: 18px;
+	max-width: 540px;
+	margin: 0 auto;
+	text-align: center;
+}
+
+.zcf-success-panel h2 {
+	margin: 0;
+	color: var(--zcf-text);
+	font-size: 28px;
+	line-height: 1.2;
+	font-weight: 800;
+}
+
+.zcf-success-panel p {
+	margin: 0 auto;
+	max-width: 440px;
+	color: var(--zcf-text);
+	font-size: 18px;
+	line-height: 1.45;
+}
+
+.zcf-success-actions {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 12px;
+	margin-top: 10px;
+}
+
+.zcf-success-actions .zcf-result-button {
+	min-height: 54px;
+	font-size: 16px;
+}
+
+.zcf-success-actions .zcf-result-button.is-primary::after {
+	content: "";
+	width: 16px;
+	height: 16px;
+	margin-left: 12px;
+	border-top: 3px solid currentColor;
+	border-right: 3px solid currentColor;
+	transform: rotate(45deg);
+}
+
+.zcf-order-card .zcf-product-main {
+	border-bottom: 0;
+	padding-bottom: 0;
+}
+
+.zcf-order-card__status {
+	margin-top: 14px;
+	padding-top: 14px;
+	border-top: 1px solid rgba(244, 241, 232, 0.5);
+	color: var(--zcf-gold);
+	font-size: 14px;
+	font-weight: 800;
+}
+
 @media (max-width: 980px) {
 	.zcf-modal {
 		width: min(94vw, 760px);
@@ -1092,6 +1156,22 @@ body.zcf-popup-open {
 	.zcf-grid {
 		grid-template-columns: 1fr;
 		gap: 24px;
+	}
+
+	.zcf-success-panel {
+		max-width: none;
+	}
+
+	.zcf-success-panel h2 {
+		font-size: 24px;
+	}
+
+	.zcf-success-panel p {
+		font-size: 16px;
+	}
+
+	.zcf-success-actions {
+		grid-template-columns: 1fr;
 	}
 
 	.zcf-customer {

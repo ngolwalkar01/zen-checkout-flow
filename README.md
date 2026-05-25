@@ -17,6 +17,7 @@ Popup-based WooCommerce cart and checkout shell for logged-in customers.
 - AJAX coupon apply/remove refreshes the custom cart and payment panel.
 - Temporary checkout-mode debug panel can surface Coin Booking Bridge cart classification when CBB is active.
 - Mixed-recovery order result states from Coin Booking Bridge can auto-open on WooCommerce order-received URLs:
+  - `completed` shows the purchase-and-booking success state.
   - `payment_failed` shows the payment retry state.
   - `booking_full` shows the class-full schedule state.
   - `booking_failed` shows the technical booking-failed state.

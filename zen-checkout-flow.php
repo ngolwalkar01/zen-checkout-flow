@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Zen Checkout Flow
  * Description: Popup-based WooCommerce checkout/cart flow for logged-in customers.
- * Version: 0.1.29
+ * Version: 0.1.30
  * Author: Custom
  * Text Domain: zen-checkout-flow
  *
@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
 if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 	final class ZCF_Zen_Checkout_Flow {
 
-		const VERSION = '0.1.29';
+		const VERSION = '0.1.30';
 		const NONCE_ACTION = 'zcf_checkout_flow';
 		private static $native_card_bootstrap_summary = null;
 
@@ -520,6 +520,10 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			$config  = self::get_mixed_recovery_result_config( $status, $result );
 			$classes = array( 'zcf-modal', 'zcf-result-modal', 'zcf-result-' . sanitize_html_class( $status ? $status : 'unknown' ) );
 
+			if ( 'completed' === $status ) {
+				return self::render_mixed_recovery_success_result( $result, $config );
+			}
+
 			ob_start();
 			?>
 			<div class="<?php echo esc_attr( implode( ' ', $classes ) ); ?>" role="dialog" aria-modal="true" aria-label="<?php echo esc_attr( $config['title'] ); ?>">
@@ -545,6 +549,48 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 		}
 
 		/**
+		 * Render the successful purchase-and-booking result in checkout layout.
+		 *
+		 * @param array $result Result data.
+		 * @param array $config Result copy/actions.
+		 * @return string
+		 */
+		private static function render_mixed_recovery_success_result( $result, $config ) {
+			$order = ! empty( $result['order_id'] ) ? wc_get_order( absint( $result['order_id'] ) ) : false;
+
+			ob_start();
+			?>
+			<div class="zcf-modal zcf-success-modal" role="dialog" aria-modal="true" aria-label="<?php echo esc_attr( $config['title'] ); ?>">
+				<div class="zcf-topbar">
+					<button type="button" class="zcf-icon-button zcf-back" data-zcf-back aria-label="<?php echo esc_attr__( 'Back', 'zen-checkout-flow' ); ?>"></button>
+					<button type="button" class="zcf-icon-button zcf-close" data-zcf-close aria-label="<?php echo esc_attr__( 'Close', 'zen-checkout-flow' ); ?>"></button>
+				</div>
+
+				<div class="zcf-grid">
+					<section class="zcf-left">
+						<?php echo self::render_customer(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+						<div class="zcf-cart-items">
+							<?php echo $order ? self::render_order_result_items( $order ) : self::render_cart_items(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+						</div>
+					</section>
+
+					<section class="zcf-right">
+						<div class="zcf-success-panel">
+							<h2><?php echo esc_html( $config['title'] ); ?></h2>
+							<p><?php echo esc_html( $config['message'] ); ?></p>
+							<div class="zcf-success-actions">
+								<?php echo self::render_result_button( $config['secondary'], true ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+								<?php echo self::render_result_button( $config['primary'] ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+							</div>
+						</div>
+					</section>
+				</div>
+			</div>
+			<?php
+			return ob_get_clean();
+		}
+
+		/**
 		 * Get copy/actions for a mixed-recovery result status.
 		 *
 		 * @param string $status Result status.
@@ -555,6 +601,19 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			$message = ! empty( $result['user_message'] ) ? $result['user_message'] : '';
 
 			$configs = array(
+				'completed' => array(
+					'title'     => __( 'Congratulations!', 'zen-checkout-flow' ),
+					'message'   => __( 'Your purchase is confirmed. You will shortly receive a confirmation email with all the details. You can already start booking and use your Zencoins!', 'zen-checkout-flow' ),
+					'primary'   => array(
+						'label'  => __( 'To Schedule', 'zen-checkout-flow' ),
+						'action' => 'schedule',
+					),
+					'secondary' => array(
+						'label'  => __( 'Profile', 'zen-checkout-flow' ),
+						'action' => 'profile',
+						'url'    => self::dependencies_loaded() ? wc_get_page_permalink( 'myaccount' ) : '',
+					),
+				),
 				'payment_failed' => array(
 					'title'     => __( 'Something went wrong...', 'zen-checkout-flow' ),
 					'message'   => $message ? $message : __( 'Please try again or use a different payment method.', 'zen-checkout-flow' ),
@@ -718,6 +777,129 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 				<?php
 			}
 
+			return ob_get_clean();
+		}
+
+		/**
+		 * Render order items for a post-checkout result state.
+		 *
+		 * @param WC_Order $order Order object.
+		 * @return string
+		 */
+		private static function render_order_result_items( $order ) {
+			$booking_items  = array();
+			$purchase_items = array();
+
+			foreach ( $order->get_items( 'line_item' ) as $item_id => $item ) {
+				if ( self::is_booking_order_item( $item_id, $item ) ) {
+					$booking_items[ $item_id ] = $item;
+				} else {
+					$purchase_items[ $item_id ] = $item;
+				}
+			}
+
+			ob_start();
+
+			if ( ! empty( $booking_items ) ) {
+				?>
+				<div class="zcf-cart-group">
+					<div class="zcf-section-title"><?php esc_html_e( 'Selected class / service:', 'zen-checkout-flow' ); ?></div>
+					<div class="zcf-cart-group__items">
+						<?php foreach ( $booking_items as $item_id => $item ) : ?>
+							<?php echo self::render_order_item_card( $item_id, $item, $order ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+						<?php endforeach; ?>
+					</div>
+				</div>
+				<?php
+			}
+
+			if ( ! empty( $purchase_items ) ) {
+				?>
+				<div class="zcf-cart-group">
+					<div class="zcf-section-title">
+						<?php echo ! empty( $booking_items ) ? esc_html__( 'Your purchase:', 'zen-checkout-flow' ) : esc_html__( 'Your product:', 'zen-checkout-flow' ); ?>
+					</div>
+					<div class="zcf-cart-group__items">
+						<?php foreach ( $purchase_items as $item_id => $item ) : ?>
+							<?php echo self::render_order_item_card( $item_id, $item, $order ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+						<?php endforeach; ?>
+					</div>
+				</div>
+				<?php
+			}
+
+			return ob_get_clean();
+		}
+
+		/**
+		 * Determine whether an order item represents a booking.
+		 *
+		 * @param int                   $item_id Order item ID.
+		 * @param WC_Order_Item_Product $item    Order item.
+		 * @return bool
+		 */
+		private static function is_booking_order_item( $item_id, $item ) {
+			if ( $item && $item->get_meta( '_cbb_coin_item_cost', true ) ) {
+				return true;
+			}
+
+			if ( class_exists( 'WC_Booking_Data_Store' ) && WC_Booking_Data_Store::get_booking_ids_from_order_item_id( $item_id ) ) {
+				return true;
+			}
+
+			$product = $item ? $item->get_product() : false;
+
+			return $product && is_callable( array( $product, 'is_type' ) ) && $product->is_type( array( 'booking', 'bookable' ) );
+		}
+
+		/**
+		 * Render a post-checkout order item card.
+		 *
+		 * @param int                   $item_id Order item ID.
+		 * @param WC_Order_Item_Product $item    Order item.
+		 * @param WC_Order              $order   Order object.
+		 * @return string
+		 */
+		private static function render_order_item_card( $item_id, $item, $order ) {
+			$product  = $item->get_product();
+			$quantity = max( 1, (int) $item->get_quantity() );
+			$subtotal = $order->get_formatted_line_subtotal( $item );
+			$coin_cost = $item->get_meta( '_cbb_coin_item_cost', true );
+
+			ob_start();
+			?>
+			<article class="zcf-product-card zcf-order-card" data-order-item-id="<?php echo esc_attr( $item_id ); ?>">
+				<div class="zcf-product-main">
+					<div>
+						<h3><?php echo esc_html( $item->get_name() ); ?></h3>
+						<div class="zcf-product-meta">
+							<?php
+							echo esc_html(
+								$coin_cost
+									? sprintf( __( 'Zencoin booking cost: %s ZC', 'zen-checkout-flow' ), wc_format_decimal( $coin_cost, 2 ) )
+									: sprintf( __( 'Quantity: %d', 'zen-checkout-flow' ), $quantity )
+							);
+							?>
+						</div>
+					</div>
+					<div class="zcf-product-price">
+						<strong><?php echo wp_kses_post( $subtotal ); ?></strong>
+						<?php echo $product ? self::render_price_suffix( $product ) : ''; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+					</div>
+				</div>
+
+				<?php if ( self::is_booking_order_item( $item_id, $item ) ) : ?>
+					<div class="zcf-order-card__status"><?php esc_html_e( 'Booked', 'zen-checkout-flow' ); ?></div>
+				<?php else : ?>
+					<details class="zcf-more">
+						<summary><?php esc_html_e( 'more information', 'zen-checkout-flow' ); ?></summary>
+						<div class="zcf-more-body">
+							<?php echo wp_kses_post( wc_display_item_meta( $item, array( 'echo' => false ) ) ); ?>
+						</div>
+					</details>
+				<?php endif; ?>
+			</article>
+			<?php
 			return ob_get_clean();
 		}
 
@@ -1301,7 +1483,7 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 
 			$status = sanitize_key( (string) $order->get_meta( '_cbb_mixed_recovery_status', true ) );
 
-			if ( ! in_array( $status, array( 'payment_failed', 'booking_full', 'booking_failed' ), true ) ) {
+			if ( ! in_array( $status, array( 'completed', 'payment_failed', 'booking_full', 'booking_failed' ), true ) ) {
 				return false;
 			}
 
