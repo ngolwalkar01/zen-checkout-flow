@@ -266,6 +266,48 @@
 
 	}
 
+	function reloadPopupToPayment(previousStep) {
+		var url;
+
+		try {
+			window.sessionStorage.setItem('zcf_step_history', JSON.stringify([previousStep || 'auto']));
+			window.sessionStorage.setItem('zcf_current_step', 'payment');
+		} catch (error) {
+			// Storage is only used to keep the popup back stack across reloads.
+		}
+
+		url = new URL(window.location.href);
+		url.searchParams.set('zcf_open_checkout', '1');
+		window.location.replace(url.toString());
+	}
+
+	function restoreStepState() {
+		var storedHistory;
+		var storedStep;
+
+		try {
+			storedHistory = window.sessionStorage.getItem('zcf_step_history');
+			storedStep = window.sessionStorage.getItem('zcf_current_step');
+			window.sessionStorage.removeItem('zcf_step_history');
+			window.sessionStorage.removeItem('zcf_current_step');
+		} catch (error) {
+			storedHistory = '';
+			storedStep = '';
+		}
+
+		if (storedHistory) {
+			try {
+				stepHistory = JSON.parse(storedHistory);
+			} catch (error) {
+				stepHistory = [];
+			}
+		}
+
+		if (storedStep) {
+			currentStep = storedStep;
+		}
+	}
+
 	function closePopup() {
 		parkPersistentCheckoutHost();
 		getPopup().removeClass('is-active').attr('aria-hidden', 'true');
@@ -297,10 +339,7 @@
 		})
 			.done(function (response) {
 				if (response && response.success) {
-					stepHistory.push(previousStep);
-					currentStep = 'payment';
-					$stage.html('<div class="zcf-popup-loading" data-zcf-popup-loading>' + zcfCheckout.i18n.loading + '</div>');
-					renderPopupShell($stage, true, 'payment');
+					reloadPopupToPayment(previousStep);
 					return;
 				}
 
@@ -471,6 +510,8 @@
 	});
 
 	$(function () {
+		restoreStepState();
+
 		if (zcfCheckout.autoOpen) {
 			openPopup();
 		}
