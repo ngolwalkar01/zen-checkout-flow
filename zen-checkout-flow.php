@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Zen Checkout Flow
  * Description: Popup-based WooCommerce checkout/cart flow for logged-in customers.
- * Version: 0.1.41
+ * Version: 0.1.42
  * Author: Custom
  * Text Domain: zen-checkout-flow
  *
@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
 if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 	final class ZCF_Zen_Checkout_Flow {
 
-		const VERSION = '0.1.41';
+		const VERSION = '0.1.42';
 		const NONCE_ACTION = 'zcf_checkout_flow';
 		private static $native_card_bootstrap_summary = null;
 
@@ -1318,6 +1318,10 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 				return array();
 			}
 
+			if ( ! in_array( $product_type, array( 'package', 'drop_in', 'membership' ), true ) ) {
+				return array();
+			}
+
 			return array(
 				'product_id'     => $parent_id,
 				'variation_id'   => $variation_id,
@@ -1345,7 +1349,7 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 				$type = sanitize_key( (string) get_post_meta( $parent_id, '_cbb_zencoin_product_type', true ) );
 			}
 
-			if ( in_array( $type, array( 'package', 'drop_in' ), true ) ) {
+			if ( in_array( $type, array( 'package', 'drop_in', 'free_drop_in', 'gift_card', 'auto_top_up' ), true ) ) {
 				return $type;
 			}
 
@@ -2268,6 +2272,12 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 
 			if ( empty( $offer ) ) {
 				wp_send_json_error( array( 'message' => __( 'This product cannot be used for Zencoin recovery.', 'zen-checkout-flow' ) ) );
+			}
+
+			foreach ( WC()->cart->get_cart() as $cart_item_key => $cart_item ) {
+				if ( ! empty( $cart_item['zcf_recovery_product'] ) ) {
+					WC()->cart->remove_cart_item( $cart_item_key );
+				}
 			}
 
 			$variation = array();
