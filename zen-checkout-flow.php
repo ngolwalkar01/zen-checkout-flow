@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Zen Checkout Flow
  * Description: Popup-based WooCommerce checkout/cart flow for logged-in customers.
- * Version: 0.1.35
+ * Version: 0.1.36
  * Author: Custom
  * Text Domain: zen-checkout-flow
  *
@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
 if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 	final class ZCF_Zen_Checkout_Flow {
 
-		const VERSION = '0.1.35';
+		const VERSION = '0.1.36';
 		const NONCE_ACTION = 'zcf_checkout_flow';
 		private static $native_card_bootstrap_summary = null;
 
@@ -1119,13 +1119,38 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 				<?php
 			else :
 				?>
-				<button type="button" class="zcf-pay-button is-disabled" disabled>
-					<?php esc_html_e( 'Add credits to continue', 'zen-checkout-flow' ); ?>
-				</button>
+				<div class="zcf-insufficient-actions">
+					<a class="zcf-result-button is-primary" href="<?php echo esc_url( self::get_recovery_products_url() ); ?>">
+						<?php esc_html_e( 'Add Zencoins', 'zen-checkout-flow' ); ?>
+					</a>
+					<button type="button" class="zcf-result-button is-secondary" data-zcf-result-action="schedule">
+						<?php esc_html_e( 'Back to Schedule', 'zen-checkout-flow' ); ?>
+					</button>
+				</div>
 				<?php
 			endif;
 
 			return ob_get_clean();
+		}
+
+		/**
+		 * Get the destination where customers can add recovery Zencoin products.
+		 *
+		 * @return string
+		 */
+		private static function get_recovery_products_url() {
+			$url = self::dependencies_loaded() ? get_permalink( wc_get_page_id( 'shop' ) ) : '';
+
+			if ( ! $url ) {
+				$url = home_url( '/' );
+			}
+
+			/**
+			 * Customize the destination used by the insufficient-Zencoin checkout prompt.
+			 *
+			 * @param string $url Default shop URL.
+			 */
+			return (string) apply_filters( 'zcf_recovery_products_url', $url );
 		}
 
 		/**

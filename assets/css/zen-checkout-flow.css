@@ -1126,6 +1126,16 @@ body.zcf-popup-open {
 	transform: rotate(45deg);
 }
 
+.zcf-insufficient-actions {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 12px;
+}
+
+.zcf-insufficient-actions .zcf-result-button {
+	min-height: 54px;
+}
+
 .zcf-order-card .zcf-product-main {
 	border-bottom: 0;
 	padding-bottom: 0;
@@ -1197,6 +1207,10 @@ body.zcf-popup-open {
 	}
 
 	.zcf-success-actions {
+		grid-template-columns: 1fr;
+	}
+
+	.zcf-insufficient-actions {
 		grid-template-columns: 1fr;
 	}
 
