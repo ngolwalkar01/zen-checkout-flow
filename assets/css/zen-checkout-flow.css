@@ -959,6 +959,105 @@ body.zcf-popup-open {
 	font-size: 14px;
 }
 
+.zcf-result-modal {
+	width: min(92vw, 520px);
+	padding: 22px 22px 30px;
+}
+
+.zcf-result-panel {
+	width: 100%;
+	margin: 0 auto;
+	padding: 22px 16px 0;
+	text-align: center;
+}
+
+.zcf-result-panel h2 {
+	margin: 0 0 22px;
+	color: var(--zcf-gold);
+	font-size: 18px;
+	line-height: 1.3;
+	font-weight: 800;
+}
+
+.zcf-result-mark {
+	width: 70px;
+	height: 70px;
+	margin: 0 auto 20px;
+	border: 2px solid rgba(244, 241, 232, 0.72);
+	border-radius: 50%;
+	position: relative;
+}
+
+.zcf-result-mark::before,
+.zcf-result-mark::after {
+	content: "";
+	position: absolute;
+	left: 50%;
+	top: 50%;
+	width: 34px;
+	height: 2px;
+	border-radius: 4px;
+	background: rgba(244, 241, 232, 0.72);
+	transform-origin: center;
+}
+
+.zcf-result-mark::before {
+	transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.zcf-result-mark::after {
+	transform: translate(-50%, -50%) rotate(-45deg);
+}
+
+.zcf-result-booking_full .zcf-result-mark::before,
+.zcf-result-booking_full .zcf-result-mark::after {
+	width: 28px;
+}
+
+.zcf-result-panel p {
+	max-width: 360px;
+	margin: 0 auto 22px;
+	color: var(--zcf-text);
+	font-size: 14px;
+	line-height: 1.45;
+}
+
+.zcf-result-actions {
+	display: grid;
+	gap: 10px;
+}
+
+.zcf-result-button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 100%;
+	min-height: 48px;
+	border-radius: 999px;
+	font-size: 14px;
+	font-weight: 800;
+	text-decoration: none;
+	cursor: pointer;
+}
+
+.zcf-result-button.is-primary {
+	border: 2px solid var(--zcf-gold);
+	background: transparent;
+	color: var(--zcf-gold);
+}
+
+.zcf-result-button.is-secondary {
+	border: 2px solid rgba(244, 241, 232, 0.68);
+	background: transparent;
+	color: rgba(244, 241, 232, 0.78);
+}
+
+.zcf-result-button:hover,
+.zcf-result-button:focus-visible {
+	background: rgba(226, 190, 82, 0.12);
+	outline: none;
+}
+
 @media (max-width: 980px) {
 	.zcf-modal {
 		width: min(94vw, 760px);

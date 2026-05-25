@@ -16,6 +16,10 @@ Popup-based WooCommerce cart and checkout shell for logged-in customers.
 - Empty carts show an empty-cart state.
 - AJAX coupon apply/remove refreshes the custom cart and payment panel.
 - Temporary checkout-mode debug panel can surface Coin Booking Bridge cart classification when CBB is active.
+- Mixed-recovery order result states from Coin Booking Bridge can auto-open on WooCommerce order-received URLs:
+  - `payment_failed` shows the payment retry state.
+  - `booking_full` shows the class-full schedule state.
+  - `booking_failed` shows the technical booking-failed state.
 - Back and close buttons trigger JavaScript events so your existing popup can close/navigate:
   - `zenCheckoutFlow:back`
   - `zenCheckoutFlow:close`
@@ -45,6 +49,10 @@ jQuery(document).on('zenCheckoutFlow:close', function (event, $shell) {
 
 jQuery(document).on('zenCheckoutFlow:back', function (event, $shell) {
   // Navigate back to the previous popup step here.
+});
+
+jQuery(document).on('zenCheckoutFlow:schedule', function () {
+  // Return the customer to the booking schedule here.
 });
 ```
 

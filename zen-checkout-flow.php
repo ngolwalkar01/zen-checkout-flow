@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Zen Checkout Flow
  * Description: Popup-based WooCommerce checkout/cart flow for logged-in customers.
- * Version: 0.1.28
+ * Version: 0.1.29
  * Author: Custom
  * Text Domain: zen-checkout-flow
  *
@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
 if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 	final class ZCF_Zen_Checkout_Flow {
 
-		const VERSION = '0.1.28';
+		const VERSION = '0.1.29';
 		const NONCE_ACTION = 'zcf_checkout_flow';
 		private static $native_card_bootstrap_summary = null;
 
@@ -199,7 +199,8 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			$has_open_flag = isset( $_GET['zcf_open_checkout'] ) && '1' === wc_clean( wp_unslash( $_GET['zcf_open_checkout'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 
 			return ( function_exists( 'is_cart' ) && is_cart() )
-				|| $has_open_flag;
+				|| $has_open_flag
+				|| self::get_mixed_recovery_result_from_request();
 		}
 
 		/**
@@ -208,6 +209,10 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 		 * @return bool
 		 */
 		private static function is_native_checkout_page() {
+			if ( self::get_mixed_recovery_result_from_request() ) {
+				return false;
+			}
+
 			return function_exists( 'is_checkout' )
 				&& is_checkout()
 				&& ( ! function_exists( 'is_order_received_page' ) || ! is_order_received_page() );
@@ -244,7 +249,7 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 
 			wp_send_json_success(
 				array(
-					'html' => self::render_shell(),
+					'html' => self::render_shell( self::get_ajax_current_url() ),
 				)
 			);
 		}
@@ -254,11 +259,11 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 		 *
 		 * @return string
 		 */
-		private static function render_shell() {
+		private static function render_shell( $current_url = '' ) {
 			ob_start();
 			?>
 			<div class="zcf-shell" data-zcf-checkout-flow>
-				<?php echo self::render_frame( __( 'Buy now:', 'zen-checkout-flow' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+				<?php echo self::render_frame( __( 'Buy now:', 'zen-checkout-flow' ), $current_url ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 			</div>
 			<?php
 			return ob_get_clean();
@@ -270,9 +275,15 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 		 * @param string $title Payment title.
 		 * @return string
 		 */
-		private static function render_frame( $title ) {
+		private static function render_frame( $title, $current_url = '' ) {
 			if ( ! is_user_logged_in() ) {
 				return self::render_logged_out();
+			}
+
+			$recovery_result = self::get_mixed_recovery_result_from_request( $current_url );
+
+			if ( $recovery_result ) {
+				return self::render_mixed_recovery_result( $recovery_result );
 			}
 
 			if ( ! WC()->cart || WC()->cart->is_empty() ) {
@@ -496,6 +507,135 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			</div>
 			<?php
 			return ob_get_clean();
+		}
+
+		/**
+		 * Render a mixed-recovery completion/result state.
+		 *
+		 * @param array $result Result data.
+		 * @return string
+		 */
+		private static function render_mixed_recovery_result( $result ) {
+			$status  = isset( $result['status'] ) ? sanitize_key( $result['status'] ) : '';
+			$config  = self::get_mixed_recovery_result_config( $status, $result );
+			$classes = array( 'zcf-modal', 'zcf-result-modal', 'zcf-result-' . sanitize_html_class( $status ? $status : 'unknown' ) );
+
+			ob_start();
+			?>
+			<div class="<?php echo esc_attr( implode( ' ', $classes ) ); ?>" role="dialog" aria-modal="true" aria-label="<?php echo esc_attr( $config['title'] ); ?>">
+				<div class="zcf-topbar">
+					<button type="button" class="zcf-icon-button zcf-back" data-zcf-back aria-label="<?php echo esc_attr__( 'Back', 'zen-checkout-flow' ); ?>"></button>
+					<button type="button" class="zcf-icon-button zcf-close" data-zcf-close aria-label="<?php echo esc_attr__( 'Close', 'zen-checkout-flow' ); ?>"></button>
+				</div>
+
+				<div class="zcf-result-panel">
+					<h2><?php echo esc_html( $config['title'] ); ?></h2>
+					<div class="zcf-result-mark" aria-hidden="true"></div>
+					<p><?php echo esc_html( $config['message'] ); ?></p>
+					<div class="zcf-result-actions">
+						<?php echo self::render_result_button( $config['primary'] ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+						<?php if ( ! empty( $config['secondary']['label'] ) ) : ?>
+							<?php echo self::render_result_button( $config['secondary'], true ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+						<?php endif; ?>
+					</div>
+				</div>
+			</div>
+			<?php
+			return ob_get_clean();
+		}
+
+		/**
+		 * Get copy/actions for a mixed-recovery result status.
+		 *
+		 * @param string $status Result status.
+		 * @param array  $result Result data.
+		 * @return array
+		 */
+		private static function get_mixed_recovery_result_config( $status, $result ) {
+			$message = ! empty( $result['user_message'] ) ? $result['user_message'] : '';
+
+			$configs = array(
+				'payment_failed' => array(
+					'title'     => __( 'Something went wrong...', 'zen-checkout-flow' ),
+					'message'   => $message ? $message : __( 'Please try again or use a different payment method.', 'zen-checkout-flow' ),
+					'primary'   => array(
+						'label'  => __( 'Try again', 'zen-checkout-flow' ),
+						'action' => 'retry',
+					),
+					'secondary' => array(
+						'label'  => __( 'Cancel', 'zen-checkout-flow' ),
+						'action' => 'close',
+					),
+				),
+				'booking_full' => array(
+					'title'     => __( 'Sorry! This class is already full', 'zen-checkout-flow' ),
+					'message'   => $message ? $message : __( 'Your payment was completed, but this class filled up at the last moment. Your Zencoins remain in your wallet so you can schedule another class.', 'zen-checkout-flow' ),
+					'primary'   => array(
+						'label'  => __( 'Schedule', 'zen-checkout-flow' ),
+						'action' => 'schedule',
+					),
+					'secondary' => array(
+						'label'  => __( 'Cancel', 'zen-checkout-flow' ),
+						'action' => 'close',
+					),
+				),
+				'booking_failed' => array(
+					'title'     => __( 'Booking failed!', 'zen-checkout-flow' ),
+					'message'   => $message ? $message : __( 'A technical issue prevented booking completion. Your Zencoins were credited to your account and you can try booking again at any time.', 'zen-checkout-flow' ),
+					'primary'   => array(
+						'label'  => __( 'Schedule', 'zen-checkout-flow' ),
+						'action' => 'schedule',
+					),
+					'secondary' => array(
+						'label'  => __( 'Profile', 'zen-checkout-flow' ),
+						'action' => 'profile',
+						'url'    => self::dependencies_loaded() ? wc_get_page_permalink( 'myaccount' ) : '',
+					),
+				),
+			);
+
+			if ( isset( $configs[ $status ] ) ) {
+				return $configs[ $status ];
+			}
+
+			return array(
+				'title'     => __( 'Booking update', 'zen-checkout-flow' ),
+				'message'   => $message ? $message : __( 'Your checkout result is ready. Please review your account or schedule another class.', 'zen-checkout-flow' ),
+				'primary'   => array(
+					'label'  => __( 'Schedule', 'zen-checkout-flow' ),
+					'action' => 'schedule',
+				),
+				'secondary' => array(
+					'label'  => __( 'Profile', 'zen-checkout-flow' ),
+					'action' => 'profile',
+					'url'    => self::dependencies_loaded() ? wc_get_page_permalink( 'myaccount' ) : '',
+				),
+			);
+		}
+
+		/**
+		 * Render a result action button.
+		 *
+		 * @param array $button       Button config.
+		 * @param bool  $is_secondary Whether secondary style should be used.
+		 * @return string
+		 */
+		private static function render_result_button( $button, $is_secondary = false ) {
+			$label  = isset( $button['label'] ) ? (string) $button['label'] : '';
+			$action = isset( $button['action'] ) ? sanitize_key( $button['action'] ) : 'close';
+			$url    = isset( $button['url'] ) ? esc_url( $button['url'] ) : '';
+
+			if ( '' === $label ) {
+				return '';
+			}
+
+			$class = $is_secondary ? 'zcf-result-button is-secondary' : 'zcf-result-button is-primary';
+
+			if ( 'profile' === $action && $url ) {
+				return '<a class="' . esc_attr( $class ) . '" href="' . esc_url( $url ) . '">' . esc_html( $label ) . '</a>';
+			}
+
+			return '<button type="button" class="' . esc_attr( $class ) . '" data-zcf-result-action="' . esc_attr( $action ) . '">' . esc_html( $label ) . '</button>';
 		}
 
 		/**
@@ -1123,6 +1263,107 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			}
 
 			return '<div class="' . esc_attr( implode( ' ', $classes ) ) . '">' . esc_html( $message ) . '</div>';
+		}
+
+		/**
+		 * Get the current URL passed by the popup AJAX renderer.
+		 *
+		 * @return string
+		 */
+		private static function get_ajax_current_url() {
+			if ( empty( $_POST['current_url'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Missing
+				return '';
+			}
+
+			return esc_url_raw( wp_unslash( $_POST['current_url'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
+		}
+
+		/**
+		 * Read a CBB mixed-recovery result from the order-received URL/order key.
+		 *
+		 * @param string $current_url Optional current frontend URL from AJAX.
+		 * @return array|false
+		 */
+		private static function get_mixed_recovery_result_from_request( $current_url = '' ) {
+			if ( ! self::dependencies_loaded() || ! is_user_logged_in() ) {
+				return false;
+			}
+
+			$order = self::get_order_from_result_request( $current_url );
+
+			if ( ! $order || 'mixed_recovery' !== $order->get_meta( '_cbb_checkout_mode', true ) ) {
+				return false;
+			}
+
+			if ( (int) $order->get_customer_id() !== get_current_user_id() && ! current_user_can( 'manage_woocommerce' ) ) {
+				return false;
+			}
+
+			$status = sanitize_key( (string) $order->get_meta( '_cbb_mixed_recovery_status', true ) );
+
+			if ( ! in_array( $status, array( 'payment_failed', 'booking_full', 'booking_failed' ), true ) ) {
+				return false;
+			}
+
+			$context = $order->get_meta( '_cbb_mixed_recovery_context', true );
+			$context = is_array( $context ) ? $context : array();
+
+			return array(
+				'order_id'      => $order->get_id(),
+				'order_number'  => $order->get_order_number(),
+				'status'        => $status,
+				'user_message'  => ! empty( $context['user_message'] ) ? wp_strip_all_tags( (string) $context['user_message'] ) : '',
+				'action'        => ! empty( $context['action'] ) ? sanitize_key( $context['action'] ) : '',
+				'updated_at_gmt' => ! empty( $context['updated_at_gmt'] ) ? sanitize_text_field( $context['updated_at_gmt'] ) : '',
+			);
+		}
+
+		/**
+		 * Resolve the order referenced by a WooCommerce result URL.
+		 *
+		 * @param string $current_url Optional URL.
+		 * @return WC_Order|false
+		 */
+		private static function get_order_from_result_request( $current_url = '' ) {
+			$order_id  = 0;
+			$order_key = '';
+
+			if ( $current_url ) {
+				$parts = wp_parse_url( $current_url );
+
+				if ( ! empty( $parts['query'] ) ) {
+					parse_str( $parts['query'], $query_args );
+					$order_key = ! empty( $query_args['key'] ) ? wc_clean( wp_unslash( $query_args['key'] ) ) : '';
+				}
+
+				if ( ! empty( $parts['path'] ) && preg_match( '#/(?:order-received|checkout/order-received)/([0-9]+)/?#', $parts['path'], $matches ) ) {
+					$order_id = absint( $matches[1] );
+				}
+			}
+
+			if ( ! $order_id && function_exists( 'is_order_received_page' ) && is_order_received_page() ) {
+				$order_id = absint( get_query_var( 'order-received' ) );
+			}
+
+			if ( ! $order_key && isset( $_GET['key'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+				$order_key = wc_clean( wp_unslash( $_GET['key'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			}
+
+			if ( $order_key && ! $order_id ) {
+				$order_id = wc_get_order_id_by_order_key( $order_key );
+			}
+
+			$order = $order_id ? wc_get_order( $order_id ) : false;
+
+			if ( ! $order ) {
+				return false;
+			}
+
+			if ( $order_key && ! hash_equals( (string) $order->get_order_key(), (string) $order_key ) ) {
+				return false;
+			}
+
+			return $order;
 		}
 
 		/**

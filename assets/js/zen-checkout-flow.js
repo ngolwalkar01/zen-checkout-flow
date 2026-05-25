@@ -148,13 +148,14 @@
 		return getPopup().find('[data-zcf-popup-stage]');
 	}
 
-	function renderPopupShell($stage) {
+	function renderPopupShell($stage, skipResult) {
 		return $.ajax({
 			type: 'POST',
 			url: zcfCheckout.ajaxUrl,
 			data: {
 				action: 'zcf_render_checkout',
-				nonce: zcfCheckout.nonce
+				nonce: zcfCheckout.nonce,
+				current_url: skipResult ? '' : window.location.href
 			}
 		}).done(function (response) {
 			if (response && response.success && response.data && response.data.html) {
@@ -239,6 +240,25 @@
 		if (openThemeLoginPopup()) {
 			closePopup();
 		}
+	});
+
+	$(document).on('click', '[data-zcf-result-action]', function () {
+		var action = $(this).data('zcf-result-action');
+		var $stage = getPopupStage();
+
+		if (action === 'retry') {
+			$stage.html('<div class="zcf-popup-loading" data-zcf-popup-loading>' + zcfCheckout.i18n.loading + '</div>');
+			renderPopupShell($stage, true);
+			return;
+		}
+
+		if (action === 'schedule') {
+			$(document).trigger('zenCheckoutFlow:schedule');
+			closePopup();
+			return;
+		}
+
+		closePopup();
 	});
 
 	$(document).on('click', '[data-zcf-close]', function () {
