@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Zen Checkout Flow
  * Description: Popup-based WooCommerce checkout/cart flow for logged-in customers.
- * Version: 0.1.30
+ * Version: 0.1.31
  * Author: Custom
  * Text Domain: zen-checkout-flow
  *
@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
 if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 	final class ZCF_Zen_Checkout_Flow {
 
-		const VERSION = '0.1.30';
+		const VERSION = '0.1.31';
 		const NONCE_ACTION = 'zcf_checkout_flow';
 		private static $native_card_bootstrap_summary = null;
 
@@ -41,6 +41,7 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			add_action( 'wp_ajax_zcf_apply_coupon', array( __CLASS__, 'ajax_apply_coupon' ) );
 			add_action( 'wp_ajax_zcf_remove_coupon', array( __CLASS__, 'ajax_remove_coupon' ) );
 			add_action( 'wp_ajax_zcf_choose_payment_method', array( __CLASS__, 'ajax_choose_payment_method' ) );
+			add_action( 'wp_ajax_zcf_book_with_zencoins', array( __CLASS__, 'ajax_book_with_zencoins' ) );
 
 			if ( is_admin() ) {
 				add_action( 'admin_notices', array( __CLASS__, 'maybe_dependency_notice' ) );
@@ -1112,7 +1113,7 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 				return '';
 			elseif ( 'zencoin_booking' === $mode ) :
 				?>
-				<button type="button" class="zcf-pay-button is-disabled" disabled>
+				<button type="button" class="zcf-pay-button" data-zcf-book-zencoins>
 					<?php esc_html_e( 'Book with Zencoins', 'zen-checkout-flow' ); ?>
 				</button>
 				<?php
@@ -1473,7 +1474,13 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 
 			$order = self::get_order_from_result_request( $current_url );
 
-			if ( ! $order || 'mixed_recovery' !== $order->get_meta( '_cbb_checkout_mode', true ) ) {
+			if ( ! $order ) {
+				return false;
+			}
+
+			$checkout_mode = (string) $order->get_meta( '_cbb_checkout_mode', true );
+
+			if ( ! in_array( $checkout_mode, array( 'mixed_recovery', 'zencoin_booking' ), true ) ) {
 				return false;
 			}
 
@@ -1482,6 +1489,10 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			}
 
 			$status = sanitize_key( (string) $order->get_meta( '_cbb_mixed_recovery_status', true ) );
+
+			if ( '' === $status && 'zencoin_booking' === $checkout_mode && $order->get_meta( '_cbb_coins_debited_transaction_id', true ) ) {
+				$status = 'completed';
+			}
 
 			if ( ! in_array( $status, array( 'completed', 'payment_failed', 'booking_full', 'booking_failed' ), true ) ) {
 				return false;
@@ -1836,6 +1847,62 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			}
 
 			wp_send_json_success();
+		}
+
+		/**
+		 * Complete an enough-Zencoin booking without a money gateway.
+		 */
+		public static function ajax_book_with_zencoins() {
+			self::verify_ajax();
+
+			if ( ! WC()->cart || WC()->cart->is_empty() ) {
+				wp_send_json_error( array( 'message' => __( 'Your cart is empty.', 'zen-checkout-flow' ) ) );
+			}
+
+			$context = self::get_checkout_context();
+			$mode    = isset( $context['mode'] ) ? $context['mode'] : 'money_purchase';
+
+			if ( 'zencoin_booking' !== $mode ) {
+				wp_send_json_error( array( 'message' => __( 'This booking is not currently covered by your Zencoin wallet.', 'zen-checkout-flow' ) ) );
+			}
+
+			self::hydrate_checkout_customer_profile();
+			WC()->cart->calculate_totals();
+
+			if ( WC()->cart->needs_payment() ) {
+				wp_send_json_error( array( 'message' => __( 'This cart still requires a payment method.', 'zen-checkout-flow' ) ) );
+			}
+
+			self::prepare_zencoin_checkout_post_data();
+			WC()->checkout()->process_checkout();
+		}
+
+		/**
+		 * Populate the minimal Woo checkout POST shape for no-payment booking.
+		 *
+		 * @return void
+		 */
+		private static function prepare_zencoin_checkout_post_data() {
+			$customer_data = self::get_checkout_customer_data();
+			$checkout      = WC()->checkout();
+
+			$_POST['woocommerce-process-checkout-nonce'] = wp_create_nonce( 'woocommerce-process_checkout' );
+			$_POST['_wpnonce']                          = $_POST['woocommerce-process-checkout-nonce'];
+			$_POST['payment_method']                    = '';
+			$_POST['terms']                             = '1';
+			$_POST['terms-field']                       = '1';
+
+			foreach ( $checkout->get_checkout_fields() as $fieldset ) {
+				foreach ( $fieldset as $key => $field ) {
+					if ( isset( $_POST[ $key ] ) && '' !== $_POST[ $key ] ) {
+						continue;
+					}
+
+					if ( isset( $customer_data[ $key ] ) ) {
+						$_POST[ $key ] = $customer_data[ $key ];
+					}
+				}
+			}
 		}
 
 		/**

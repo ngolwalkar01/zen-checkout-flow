@@ -140,6 +140,42 @@
 			});
 	}
 
+	function bookWithZencoins($shell) {
+		setLoading($shell, true);
+
+		return $.ajax({
+			type: 'POST',
+			url: zcfCheckout.ajaxUrl,
+			data: {
+				action: 'zcf_book_with_zencoins',
+				nonce: zcfCheckout.nonce
+			}
+		})
+			.done(function (response) {
+				if (response && response.result === 'success' && response.redirect) {
+					window.location.href = response.redirect;
+					return;
+				}
+
+				if (response && response.success && response.data && response.data.redirect) {
+					window.location.href = response.data.redirect;
+					return;
+				}
+
+				showMessage(
+					$shell,
+					response && response.messages ? response.messages : (response && response.data ? response.data.message : zcfCheckout.i18n.error),
+					'error'
+				);
+			})
+			.fail(function () {
+				showMessage($shell, zcfCheckout.i18n.error, 'error');
+			})
+			.always(function () {
+				setLoading($shell, false);
+			});
+	}
+
 	function getPopup() {
 		return $('#zcf-popup');
 	}
@@ -230,6 +266,10 @@
 		if ($right.length) {
 			$right.get(0).scrollIntoView({ behavior: 'smooth', block: 'start' });
 		}
+	});
+
+	$(document).on('click', '[data-zcf-book-zencoins]', function () {
+		bookWithZencoins($(this).closest('[data-zcf-checkout-flow]'));
 	});
 
 	$(document).on('click', '[data-zcf-back]', function () {

@@ -15,6 +15,7 @@ Popup-based WooCommerce cart and checkout shell for logged-in customers.
 - Logged-out visitors see a login-required state.
 - Empty carts show an empty-cart state.
 - AJAX coupon apply/remove refreshes the custom cart and payment panel.
+- Enough-Zencoin booking carts can be completed from the popup without showing payment gateways.
 - Temporary checkout-mode debug panel can surface Coin Booking Bridge cart classification when CBB is active.
 - Mixed-recovery order result states from Coin Booking Bridge can auto-open on WooCommerce order-received URLs:
   - `completed` shows the purchase-and-booking success state.
