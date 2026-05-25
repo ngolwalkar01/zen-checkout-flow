@@ -1,6 +1,9 @@
 (function ($) {
 	'use strict';
 
+	var currentStep = 'auto';
+	var stepHistory = [];
+
 	function setLoading($shell, isLoading) {
 		$shell.toggleClass('is-loading', !!isLoading);
 	}
@@ -18,6 +21,11 @@
 
 		if (Object.prototype.hasOwnProperty.call(data, 'payButtonHtml')) {
 			$shell.find('[data-zcf-primary-action]').html(data.payButtonHtml);
+		}
+
+		if (data.step) {
+			currentStep = data.step;
+			$shell.find('.zcf-modal').attr('data-zcf-step', data.step);
 		}
 
 		attachPersistentCheckoutHost($shell);
@@ -184,18 +192,20 @@
 		return getPopup().find('[data-zcf-popup-stage]');
 	}
 
-	function renderPopupShell($stage, skipResult) {
+	function renderPopupShell($stage, skipResult, step) {
 		return $.ajax({
 			type: 'POST',
 			url: zcfCheckout.ajaxUrl,
 			data: {
 				action: 'zcf_render_checkout',
 				nonce: zcfCheckout.nonce,
-				current_url: skipResult ? '' : window.location.href
+				current_url: skipResult ? '' : window.location.href,
+				zcf_step: step || 'auto'
 			}
 		}).done(function (response) {
 			if (response && response.success && response.data && response.data.html) {
 				$stage.html(response.data.html);
+				currentStep = getShellStep($stage) || response.data.step || step || 'auto';
 				attachPersistentCheckoutHost($stage);
 				return;
 			}
@@ -225,10 +235,12 @@
 
 		if (!hasShell) {
 			$stage.html('<div class="zcf-popup-loading" data-zcf-popup-loading>' + zcfCheckout.i18n.loading + '</div>');
+			stepHistory = [];
 			renderPopupShell($stage);
 			return;
 		}
 
+		currentStep = getShellStep($stage) || currentStep;
 		attachPersistentCheckoutHost($stage);
 
 	}
@@ -237,6 +249,98 @@
 		parkPersistentCheckoutHost();
 		getPopup().removeClass('is-active').attr('aria-hidden', 'true');
 		$('body').removeClass('zcf-popup-open');
+	}
+
+	function getShellStep($scope) {
+		var $modal = $scope.find('.zcf-modal[data-zcf-step]').first();
+
+		return $modal.length ? String($modal.attr('data-zcf-step') || 'auto') : 'auto';
+	}
+
+	function addRecoveryProduct($button) {
+		var $shell = $button.closest('[data-zcf-checkout-flow]');
+		var $stage = getPopupStage();
+		var previousStep = currentStep || getShellStep($shell) || 'auto';
+
+		setLoading($shell, true);
+
+		return $.ajax({
+			type: 'POST',
+			url: zcfCheckout.ajaxUrl,
+			data: {
+				action: 'zcf_add_recovery_product',
+				nonce: zcfCheckout.nonce,
+				product_id: $button.data('product-id') || 0,
+				variation_id: $button.data('variation-id') || 0
+			}
+		})
+			.done(function (response) {
+				if (response && response.success) {
+					stepHistory.push(previousStep);
+					currentStep = 'payment';
+					$stage.html('<div class="zcf-popup-loading" data-zcf-popup-loading>' + zcfCheckout.i18n.loading + '</div>');
+					renderPopupShell($stage, true, 'payment');
+					return;
+				}
+
+				showMessage($shell, response && response.data ? response.data.message : zcfCheckout.i18n.error, 'error');
+			})
+			.fail(function () {
+				showMessage($shell, zcfCheckout.i18n.error, 'error');
+			})
+			.always(function () {
+				setLoading($shell, false);
+			});
+	}
+
+	function goBackStep() {
+		var previousStep = stepHistory.pop();
+		var $stage = getPopupStage();
+		var $shell = $stage.find('[data-zcf-checkout-flow]').first();
+
+		if (!previousStep) {
+			closePopup();
+			return;
+		}
+
+		if (currentStep === 'payment') {
+			setLoading($shell, true);
+
+			$.ajax({
+				type: 'POST',
+				url: zcfCheckout.ajaxUrl,
+				data: {
+					action: 'zcf_remove_recovery_products',
+					nonce: zcfCheckout.nonce,
+					zcf_step: previousStep
+				}
+			}).always(function () {
+				currentStep = previousStep;
+				$stage.html('<div class="zcf-popup-loading" data-zcf-popup-loading>' + zcfCheckout.i18n.loading + '</div>');
+				renderPopupShell($stage, true, previousStep);
+			});
+			return;
+		}
+
+		$stage.html('<div class="zcf-popup-loading" data-zcf-popup-loading>' + zcfCheckout.i18n.loading + '</div>');
+		renderPopupShell($stage, true, previousStep);
+	}
+
+	function filterPlanCards($button) {
+		var type = String($button.data('zcf-plan-tab') || 'all');
+		var $chooser = $button.closest('.zcf-plan-chooser');
+
+		$button
+			.addClass('is-active')
+			.siblings('[data-zcf-plan-tab]')
+			.removeClass('is-active');
+
+		$chooser.find('[data-zcf-plan-type]').each(function () {
+			var $card = $(this);
+			var cardType = String($card.data('zcf-plan-type') || '');
+
+			$card.toggle(type === 'all' || cardType === type);
+		});
 	}
 
 	function isCartOrCheckoutUrl(url) {
@@ -273,17 +377,15 @@
 	});
 
 	$(document).on('click', '[data-zcf-add-recovery-product]', function () {
-		var $button = $(this);
-		var $shell = $button.closest('[data-zcf-checkout-flow]');
-
-		request($shell, 'zcf_add_recovery_product', {
-			product_id: $button.data('product-id') || 0,
-			variation_id: $button.data('variation-id') || 0
-		});
+		addRecoveryProduct($(this));
 	});
 
 	$(document).on('click', '[data-zcf-back]', function () {
-		closePopup();
+		goBackStep();
+	});
+
+	$(document).on('click', '[data-zcf-plan-tab]', function () {
+		filterPlanCards($(this));
 	});
 
 	$(document).on('click', '[data-zcf-login]', function () {
@@ -298,7 +400,7 @@
 
 		if (action === 'retry') {
 			$stage.html('<div class="zcf-popup-loading" data-zcf-popup-loading>' + zcfCheckout.i18n.loading + '</div>');
-			renderPopupShell($stage, true);
+			renderPopupShell($stage, true, 'payment');
 			return;
 		}
 

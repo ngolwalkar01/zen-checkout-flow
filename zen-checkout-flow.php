@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Zen Checkout Flow
  * Description: Popup-based WooCommerce checkout/cart flow for logged-in customers.
- * Version: 0.1.37
+ * Version: 0.1.38
  * Author: Custom
  * Text Domain: zen-checkout-flow
  *
@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
 if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 	final class ZCF_Zen_Checkout_Flow {
 
-		const VERSION = '0.1.37';
+		const VERSION = '0.1.38';
 		const NONCE_ACTION = 'zcf_checkout_flow';
 		private static $native_card_bootstrap_summary = null;
 
@@ -43,6 +43,7 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			add_action( 'wp_ajax_zcf_choose_payment_method', array( __CLASS__, 'ajax_choose_payment_method' ) );
 			add_action( 'wp_ajax_zcf_book_with_zencoins', array( __CLASS__, 'ajax_book_with_zencoins' ) );
 			add_action( 'wp_ajax_zcf_add_recovery_product', array( __CLASS__, 'ajax_add_recovery_product' ) );
+			add_action( 'wp_ajax_zcf_remove_recovery_products', array( __CLASS__, 'ajax_remove_recovery_products' ) );
 
 			if ( is_admin() ) {
 				add_action( 'admin_notices', array( __CLASS__, 'maybe_dependency_notice' ) );
@@ -251,7 +252,8 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 
 			wp_send_json_success(
 				array(
-					'html' => self::render_shell( self::get_ajax_current_url() ),
+					'html' => self::render_shell( self::get_ajax_current_url(), self::get_ajax_step() ),
+					'step' => self::normalize_step( self::get_ajax_step() ),
 				)
 			);
 		}
@@ -261,11 +263,11 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 		 *
 		 * @return string
 		 */
-		private static function render_shell( $current_url = '' ) {
+		private static function render_shell( $current_url = '', $step = 'auto' ) {
 			ob_start();
 			?>
 			<div class="zcf-shell" data-zcf-checkout-flow>
-				<?php echo self::render_frame( __( 'Buy now:', 'zen-checkout-flow' ), $current_url ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+				<?php echo self::render_frame( __( 'Buy now:', 'zen-checkout-flow' ), $current_url, $step ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 			</div>
 			<?php
 			return ob_get_clean();
@@ -277,7 +279,7 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 		 * @param string $title Payment title.
 		 * @return string
 		 */
-		private static function render_frame( $title, $current_url = '' ) {
+		private static function render_frame( $title, $current_url = '', $step = 'auto' ) {
 			if ( ! is_user_logged_in() ) {
 				return self::render_logged_out();
 			}
@@ -293,11 +295,12 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			}
 
 			$context             = self::get_checkout_context();
-			$money_mode          = isset( $context['mode'] ) && in_array( $context['mode'], array( 'money_purchase', 'mixed_recovery' ), true );
+			$step                = self::resolve_frame_step( $context, $step );
+			$show_checkout_intro = 'payment' === $step;
 
 			ob_start();
 			?>
-			<div class="zcf-modal" role="dialog" aria-modal="true" aria-label="<?php echo esc_attr__( 'Checkout', 'zen-checkout-flow' ); ?>">
+			<div class="zcf-modal" role="dialog" aria-modal="true" aria-label="<?php echo esc_attr__( 'Checkout', 'zen-checkout-flow' ); ?>" data-zcf-step="<?php echo esc_attr( $step ); ?>">
 				<div class="zcf-topbar">
 					<button type="button" class="zcf-icon-button zcf-back" data-zcf-back aria-label="<?php echo esc_attr__( 'Back', 'zen-checkout-flow' ); ?>"></button>
 					<button type="button" class="zcf-icon-button zcf-close" data-zcf-close aria-label="<?php echo esc_attr__( 'Close', 'zen-checkout-flow' ); ?>"></button>
@@ -312,14 +315,16 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 					</section>
 
 					<section class="zcf-right">
-						<h2><?php echo esc_html( $title ); ?></h2>
-						<p class="zcf-muted"><?php esc_html_e( 'A confirmation of your purchase will be sent to you by email.', 'zen-checkout-flow' ); ?></p>
+						<?php if ( $show_checkout_intro ) : ?>
+							<h2><?php echo esc_html( $title ); ?></h2>
+							<p class="zcf-muted"><?php esc_html_e( 'A confirmation of your purchase will be sent to you by email.', 'zen-checkout-flow' ); ?></p>
+						<?php endif; ?>
 
 						<div class="zcf-payment-panel" data-zcf-payment-panel>
-							<?php echo self::render_payment_panel(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+							<?php echo self::render_payment_panel( $step ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 						</div>
 
-						<?php if ( ! $money_mode ) : ?>
+						<?php if ( 'zencoin_booking' === ( isset( $context['mode'] ) ? $context['mode'] : '' ) ) : ?>
 							<p class="zcf-terms">
 								<?php esc_html_e( 'By completing this purchase, you agree to the', 'zen-checkout-flow' ); ?>
 								<a href="<?php echo esc_url( wc_get_page_permalink( 'terms' ) ); ?>"><?php esc_html_e( 'terms and conditions.', 'zen-checkout-flow' ); ?></a>
@@ -1022,9 +1027,10 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 		 *
 		 * @return string
 		 */
-		private static function render_payment_panel() {
+		private static function render_payment_panel( $step = 'auto' ) {
 			$context            = self::get_checkout_context();
 			$mode               = isset( $context['mode'] ) ? $context['mode'] : 'money_purchase';
+			$step               = self::resolve_frame_step( $context, $step );
 
 			ob_start();
 			?>
@@ -1050,7 +1056,7 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 				<div class="zcf-payment-label"><?php esc_html_e( 'Payment method:', 'zen-checkout-flow' ); ?></div>
 				<div class="zcf-no-gateways"><?php esc_html_e( 'No payment gateway is needed when your booking is fully covered by Zencoins.', 'zen-checkout-flow' ); ?></div>
 			<?php else : ?>
-				<?php echo self::render_insufficient_zencoin_prompt( $context ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+				<?php echo self::render_insufficient_zencoin_prompt( $context, $step ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 			<?php endif; ?>
 			<?php
 			return ob_get_clean();
@@ -1127,12 +1133,12 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 		 * @param array $context Checkout context.
 		 * @return string
 		 */
-		private static function render_insufficient_zencoin_prompt( $context ) {
+		private static function render_insufficient_zencoin_prompt( $context, $step = 'auto' ) {
 			$available = isset( $context['available_zencoins'] ) ? (float) $context['available_zencoins'] : 0.0;
 			$missing   = isset( $context['missing_zencoins'] ) ? (float) $context['missing_zencoins'] : 0.0;
 			$offers    = self::get_recovery_product_offers( $missing );
 			$best      = self::get_best_recovery_offer( $offers, $missing );
-			$is_zero   = $available <= 0;
+			$is_zero   = 'choose_plan' === self::resolve_frame_step( $context, $step );
 
 			ob_start();
 			?>
@@ -1140,7 +1146,6 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 				<?php if ( $is_zero ) : ?>
 					<div class="zcf-plan-chooser__header">
 						<h3><?php esc_html_e( 'Please choose the plan', 'zen-checkout-flow' ); ?></h3>
-						<p><?php esc_html_e( 'Buy Zencoins first and we will continue with your booking checkout.', 'zen-checkout-flow' ); ?></p>
 					</div>
 				<?php else : ?>
 					<div class="zcf-shortage-prompt__card">
@@ -1194,9 +1199,15 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 
 			ob_start();
 			?>
+			<div class="zcf-plan-tabs" role="tablist" aria-label="<?php echo esc_attr__( 'Zencoin plan categories', 'zen-checkout-flow' ); ?>">
+				<button type="button" class="is-active" data-zcf-plan-tab="all"><?php esc_html_e( 'All', 'zen-checkout-flow' ); ?></button>
+				<button type="button" data-zcf-plan-tab="drop_in"><?php esc_html_e( 'Drop-Ins', 'zen-checkout-flow' ); ?></button>
+				<button type="button" data-zcf-plan-tab="package"><?php esc_html_e( 'Packages', 'zen-checkout-flow' ); ?></button>
+				<button type="button" data-zcf-plan-tab="membership"><?php esc_html_e( 'Memberships', 'zen-checkout-flow' ); ?></button>
+			</div>
 			<div class="zcf-recovery-offers">
 				<?php foreach ( $offers as $offer ) : ?>
-					<article class="zcf-recovery-card">
+					<article class="zcf-recovery-card" data-zcf-plan-type="<?php echo esc_attr( $offer['product_type'] ); ?>">
 						<div class="zcf-recovery-card__main">
 							<strong><?php echo esc_html( $offer['title'] ); ?></strong>
 							<span><?php echo esc_html( $offer['validity_label'] ); ?></span>
@@ -1293,6 +1304,7 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			$variation_id = $product->is_type( 'variation' ) ? $product_id : 0;
 			$parent_id    = $variation_id ? $product->get_parent_id() : $product_id;
 			$zencoins     = (float) get_post_meta( $product_id, '_cbb_zencoin_grant_amount', true );
+			$product_type = self::get_recovery_offer_product_type( $product, $product_id, $parent_id );
 
 			if ( $zencoins <= 0 ) {
 				$zencoins = (float) get_post_meta( $product_id, '_cbb_coin_grant_amount', true );
@@ -1311,10 +1323,37 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 				'variation_id'   => $variation_id,
 				'title'          => wp_strip_all_tags( $product->get_name() ),
 				'price_html'     => $product->get_price_html(),
+				'product_type'   => $product_type,
 				'zencoins'       => $zencoins,
 				'zencoins_label' => wc_format_decimal( $zencoins, 0 ),
 				'validity_label' => self::get_recovery_product_validity_label( $product_id, $parent_id ),
 			);
+		}
+
+		/**
+		 * Get recovery offer product type for UI tabs.
+		 *
+		 * @param WC_Product $product    Product.
+		 * @param int        $product_id Product ID.
+		 * @param int        $parent_id  Parent product ID.
+		 * @return string
+		 */
+		private static function get_recovery_offer_product_type( $product, $product_id, $parent_id ) {
+			$type = sanitize_key( (string) get_post_meta( $product_id, '_cbb_zencoin_product_type', true ) );
+
+			if ( ( ! $type || 'none' === $type ) && $parent_id !== $product_id ) {
+				$type = sanitize_key( (string) get_post_meta( $parent_id, '_cbb_zencoin_product_type', true ) );
+			}
+
+			if ( in_array( $type, array( 'package', 'drop_in' ), true ) ) {
+				return $type;
+			}
+
+			if ( is_callable( array( $product, 'is_type' ) ) && $product->is_type( array( 'subscription', 'variable-subscription', 'subscription_variation' ) ) ) {
+				return 'membership';
+			}
+
+			return 'package';
 		}
 
 		/**
@@ -1712,6 +1751,53 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			}
 
 			return esc_url_raw( wp_unslash( $_POST['current_url'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
+		}
+
+		/**
+		 * Get requested popup step from AJAX.
+		 *
+		 * @return string
+		 */
+		private static function get_ajax_step() {
+			if ( empty( $_POST['zcf_step'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Missing
+				return 'auto';
+			}
+
+			return self::normalize_step( sanitize_key( wp_unslash( $_POST['zcf_step'] ) ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
+		}
+
+		/**
+		 * Normalize a checkout popup step.
+		 *
+		 * @param string $step Requested step.
+		 * @return string
+		 */
+		private static function normalize_step( $step ) {
+			return in_array( $step, array( 'auto', 'choose_plan', 'shortage_prompt', 'payment' ), true ) ? $step : 'auto';
+		}
+
+		/**
+		 * Resolve the actual frame step from context and requested step.
+		 *
+		 * @param array  $context Checkout context.
+		 * @param string $step    Requested step.
+		 * @return string
+		 */
+		private static function resolve_frame_step( $context, $step ) {
+			$step = self::normalize_step( $step );
+			$mode = isset( $context['mode'] ) ? $context['mode'] : 'money_purchase';
+
+			if ( in_array( $mode, array( 'money_purchase', 'mixed_recovery', 'zencoin_booking' ), true ) ) {
+				return 'payment';
+			}
+
+			if ( in_array( $step, array( 'choose_plan', 'shortage_prompt' ), true ) ) {
+				return $step;
+			}
+
+			$available = isset( $context['available_zencoins'] ) ? (float) $context['available_zencoins'] : 0.0;
+
+			return $available <= 0 ? 'choose_plan' : 'shortage_prompt';
 		}
 
 		/**
@@ -2184,14 +2270,63 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 				wp_send_json_error( array( 'message' => __( 'This product cannot be used for Zencoin recovery.', 'zen-checkout-flow' ) ) );
 			}
 
-			$cart_item_key = WC()->cart->add_to_cart( $product_id, 1, $variation_id );
+			$variation = array();
+
+			if ( $variation_id && is_callable( array( $product, 'get_variation_attributes' ) ) ) {
+				$variation = $product->get_variation_attributes();
+			}
+
+			$cart_item_key = WC()->cart->add_to_cart(
+				$product_id,
+				1,
+				$variation_id,
+				$variation,
+				array(
+					'zcf_recovery_product' => true,
+				)
+			);
 
 			if ( ! $cart_item_key ) {
 				wp_send_json_error( array( 'message' => __( 'Unable to add this Zencoin plan. Please try again.', 'zen-checkout-flow' ) ) );
 			}
 
 			WC()->cart->calculate_totals();
-			self::send_fragments();
+			wp_send_json_success(
+				array(
+					'cartItems'     => self::render_cart_items(),
+					'paymentPanel'  => self::render_payment_panel( 'payment' ),
+					'payButtonHtml' => self::render_primary_action(),
+					'step'          => 'payment',
+				)
+			);
+		}
+
+		/**
+		 * Remove recovery products added by the popup step flow.
+		 */
+		public static function ajax_remove_recovery_products() {
+			self::verify_ajax();
+
+			if ( ! WC()->cart ) {
+				wp_send_json_error( array( 'message' => __( 'Your cart is unavailable.', 'zen-checkout-flow' ) ) );
+			}
+
+			foreach ( WC()->cart->get_cart() as $cart_item_key => $cart_item ) {
+				if ( ! empty( $cart_item['zcf_recovery_product'] ) ) {
+					WC()->cart->remove_cart_item( $cart_item_key );
+				}
+			}
+
+			WC()->cart->calculate_totals();
+
+			wp_send_json_success(
+				array(
+					'cartItems'     => self::render_cart_items(),
+					'paymentPanel'  => self::render_payment_panel( self::get_ajax_step() ),
+					'payButtonHtml' => self::render_primary_action(),
+					'step'          => self::normalize_step( self::get_ajax_step() ),
+				)
+			);
 		}
 
 		/**

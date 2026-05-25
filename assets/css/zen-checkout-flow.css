@@ -714,16 +714,16 @@ body.zcf-popup-open {
 .zcf-plan-chooser,
 .zcf-shortage-prompt {
 	display: grid;
-	gap: 16px;
+	gap: 14px;
 }
 
 .zcf-plan-chooser__header h3,
 .zcf-shortage-prompt__card h3 {
-	margin: 0 0 8px;
-	color: var(--zcf-gold);
-	font-size: 16px;
-	line-height: 1.3;
-	font-weight: 800;
+	margin: 0;
+	color: var(--zcf-text);
+	font-size: 20px;
+	line-height: 1.25;
+	font-weight: 500;
 }
 
 .zcf-plan-chooser__header p,
@@ -735,10 +735,18 @@ body.zcf-popup-open {
 }
 
 .zcf-shortage-prompt__card {
+	width: min(100%, 360px);
+	margin: 0 auto;
 	padding: 18px;
 	border-radius: 8px;
 	background: rgba(42, 42, 42, 0.52);
 	text-align: center;
+}
+
+.zcf-shortage-prompt__card h3 {
+	color: var(--zcf-gold);
+	font-size: 15px;
+	font-weight: 800;
 }
 
 .zcf-shortage-prompt__actions {
@@ -747,10 +755,41 @@ body.zcf-popup-open {
 	margin-top: 16px;
 }
 
+.zcf-plan-tabs {
+	display: flex;
+	gap: 8px;
+	overflow-x: auto;
+	padding-bottom: 6px;
+	scrollbar-width: none;
+}
+
+.zcf-plan-tabs::-webkit-scrollbar {
+	display: none;
+}
+
+.zcf-plan-tabs button {
+	flex: 0 0 auto;
+	min-width: 88px;
+	min-height: 42px;
+	border: 2px solid rgba(244, 241, 232, 0.68);
+	border-radius: 999px;
+	padding: 0 18px;
+	background: rgba(63, 63, 65, 0.92);
+	color: var(--zcf-text);
+	font-size: 15px;
+	cursor: pointer;
+}
+
+.zcf-plan-tabs button.is-active {
+	border-color: var(--zcf-gold);
+	background: var(--zcf-gold);
+	color: #393735;
+}
+
 .zcf-recovery-offers {
 	display: grid;
 	gap: 10px;
-	max-height: min(54vh, 620px);
+	max-height: min(58vh, 720px);
 	overflow-y: auto;
 	padding-right: 4px;
 	scrollbar-width: thin;
@@ -767,7 +806,9 @@ body.zcf-popup-open {
 	padding: 16px 12px;
 	border: 2px solid rgba(244, 241, 232, 0.58);
 	border-radius: 8px;
-	background: rgba(29, 31, 27, 0.52);
+	background:
+		radial-gradient(circle at 88% 12%, rgba(226, 190, 82, 0.13), transparent 26%),
+		rgba(29, 31, 27, 0.52);
 }
 
 .zcf-recovery-card__main,

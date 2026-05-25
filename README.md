@@ -20,6 +20,7 @@ Popup-based WooCommerce cart and checkout shell for logged-in customers.
   - 0 ZC customers see an in-popup plan chooser.
   - customers missing a smaller amount see a compact buy-missing-ZC prompt.
   - choosing a recovery product adds it to cart and refreshes into mixed-recovery payment.
+  - the popup back arrow returns from payment to the previous recovery step and removes the selected recovery product.
 - Temporary checkout-mode debug panel can surface Coin Booking Bridge cart classification when CBB is active.
 - Mixed-recovery order result states from Coin Booking Bridge can auto-open on WooCommerce order-received URLs:
   - `completed` shows the purchase-and-booking success state.
