@@ -1059,6 +1059,23 @@ body.zcf-popup-open {
 }
 
 .zcf-success-modal .zcf-grid {
+	flex: 1;
+	align-items: center;
+}
+
+.zcf-success-modal {
+	display: flex;
+	flex-direction: column;
+	min-height: min(760px, calc(100dvh - (clamp(24px, 3vw, 56px) * 2)));
+}
+
+.zcf-success-modal .zcf-left,
+.zcf-success-modal .zcf-right {
+	min-height: 100%;
+}
+
+.zcf-success-modal .zcf-right {
+	display: flex;
 	align-items: center;
 }
 
@@ -1066,6 +1083,7 @@ body.zcf-popup-open {
 	display: grid;
 	gap: 18px;
 	max-width: 540px;
+	width: 100%;
 	margin: 0 auto;
 	text-align: center;
 }
@@ -1129,6 +1147,10 @@ body.zcf-popup-open {
 		border-radius: 18px;
 	}
 
+	.zcf-success-modal {
+		min-height: min(720px, calc(100dvh - 48px));
+	}
+
 	.zcf-topbar {
 		margin-bottom: 18px;
 	}
@@ -1160,6 +1182,10 @@ body.zcf-popup-open {
 
 	.zcf-success-panel {
 		max-width: none;
+	}
+
+	.zcf-success-modal .zcf-right {
+		align-items: start;
 	}
 
 	.zcf-success-panel h2 {
