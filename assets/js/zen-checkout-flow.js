@@ -8,15 +8,15 @@
 	function updateFragments($shell, data) {
 		parkPersistentCheckoutHost();
 
-		if (data.cartItems) {
+		if (Object.prototype.hasOwnProperty.call(data, 'cartItems')) {
 			$shell.find('[data-zcf-cart-items]').html(data.cartItems);
 		}
 
-		if (data.paymentPanel) {
+		if (Object.prototype.hasOwnProperty.call(data, 'paymentPanel')) {
 			$shell.find('[data-zcf-payment-panel]').html(data.paymentPanel);
 		}
 
-		if (data.payButtonHtml) {
+		if (Object.prototype.hasOwnProperty.call(data, 'payButtonHtml')) {
 			$shell.find('[data-zcf-primary-action]').html(data.payButtonHtml);
 		}
 
@@ -270,6 +270,16 @@
 
 	$(document).on('click', '[data-zcf-book-zencoins]', function () {
 		bookWithZencoins($(this).closest('[data-zcf-checkout-flow]'));
+	});
+
+	$(document).on('click', '[data-zcf-add-recovery-product]', function () {
+		var $button = $(this);
+		var $shell = $button.closest('[data-zcf-checkout-flow]');
+
+		request($shell, 'zcf_add_recovery_product', {
+			product_id: $button.data('product-id') || 0,
+			variation_id: $button.data('variation-id') || 0
+		});
 	});
 
 	$(document).on('click', '[data-zcf-back]', function () {

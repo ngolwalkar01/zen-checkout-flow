@@ -16,7 +16,10 @@ Popup-based WooCommerce cart and checkout shell for logged-in customers.
 - Empty carts show an empty-cart state.
 - AJAX coupon apply/remove refreshes the custom cart and payment panel.
 - Enough-Zencoin booking carts can be completed from the popup without showing payment gateways.
-- Insufficient-Zencoin booking carts hide gateways and route the customer to add recovery Zencoin products before checkout can continue.
+- Insufficient-Zencoin booking carts hide gateways and show the Figma-aligned recovery path:
+  - 0 ZC customers see an in-popup plan chooser.
+  - customers missing a smaller amount see a compact buy-missing-ZC prompt.
+  - choosing a recovery product adds it to cart and refreshes into mixed-recovery payment.
 - Temporary checkout-mode debug panel can surface Coin Booking Bridge cart classification when CBB is active.
 - Mixed-recovery order result states from Coin Booking Bridge can auto-open on WooCommerce order-received URLs:
   - `completed` shows the purchase-and-booking success state.
@@ -61,7 +64,7 @@ jQuery(document).on('zenCheckoutFlow:schedule', function () {
 
 ## Filters
 
-Point the insufficient-Zencoin prompt at a custom packages/memberships page:
+Point the insufficient-Zencoin fallback link at a custom packages/memberships page:
 
 ```php
 add_filter( 'zcf_recovery_products_url', function () {
