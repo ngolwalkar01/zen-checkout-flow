@@ -1472,19 +1472,6 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 				return false;
 			}
 
-			$preview_status = self::get_debug_result_preview_status( $current_url );
-
-			if ( $preview_status ) {
-				return array(
-					'order_id'      => 0,
-					'order_number'  => __( 'Preview', 'zen-checkout-flow' ),
-					'status'        => $preview_status,
-					'user_message'  => '',
-					'action'        => 'preview',
-					'updated_at_gmt' => gmdate( 'Y-m-d H:i:s' ),
-				);
-			}
-
 			$order = self::get_order_from_result_request( $current_url );
 
 			if ( ! $order ) {
@@ -1522,35 +1509,6 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 				'action'        => ! empty( $context['action'] ) ? sanitize_key( $context['action'] ) : '',
 				'updated_at_gmt' => ! empty( $context['updated_at_gmt'] ) ? sanitize_text_field( $context['updated_at_gmt'] ) : '',
 			);
-		}
-
-		/**
-		 * Read a temporary admin-only result popup preview status.
-		 *
-		 * @param string $current_url Optional URL.
-		 * @return string
-		 */
-		private static function get_debug_result_preview_status( $current_url = '' ) {
-			if ( ! defined( 'WP_DEBUG' ) || ! WP_DEBUG || ! current_user_can( 'manage_options' ) ) {
-				return '';
-			}
-
-			$status = '';
-
-			if ( $current_url ) {
-				$parts = wp_parse_url( $current_url );
-
-				if ( ! empty( $parts['query'] ) ) {
-					parse_str( $parts['query'], $query_args );
-					$status = ! empty( $query_args['zcf_result_preview'] ) ? sanitize_key( wp_unslash( $query_args['zcf_result_preview'] ) ) : '';
-				}
-			}
-
-			if ( '' === $status && isset( $_GET['zcf_result_preview'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-				$status = sanitize_key( wp_unslash( $_GET['zcf_result_preview'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-			}
-
-			return in_array( $status, array( 'completed', 'payment_failed', 'booking_full', 'booking_failed' ), true ) ? $status : '';
 		}
 
 		/**
