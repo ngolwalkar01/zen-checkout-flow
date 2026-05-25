@@ -29,6 +29,7 @@
 		}
 
 		attachPersistentCheckoutHost($shell);
+		clearStaleCoinBalanceNotices($shell);
 	}
 
 	function getPersistentCheckoutHost() {
@@ -59,6 +60,26 @@
 		}
 
 		$slot.empty().append($host);
+		clearStaleCoinBalanceNotices($shell);
+	}
+
+	function clearStaleCoinBalanceNotices($scope) {
+		var patterns = [
+			/current balance is/i,
+			/you need \d+(?:[.,]\d+)? coins for these bookings/i
+		];
+
+		$scope.find('.wc-block-components-notice-banner, .woocommerce-error, [role="alert"]').each(function () {
+			var $notice = $(this);
+			var text = $notice.text() || '';
+			var isCoinBalanceNotice = patterns.some(function (pattern) {
+				return pattern.test(text);
+			});
+
+			if (isCoinBalanceNotice) {
+				$notice.remove();
+			}
+		});
 	}
 
 	function showMessage($shell, message, type) {
