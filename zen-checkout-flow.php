@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Zen Checkout Flow
  * Description: Popup-based WooCommerce checkout/cart flow for logged-in customers.
- * Version: 0.1.32
+ * Version: 0.1.33
  * Author: Custom
  * Text Domain: zen-checkout-flow
  *
@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
 if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 	final class ZCF_Zen_Checkout_Flow {
 
-		const VERSION = '0.1.32';
+		const VERSION = '0.1.33';
 		const NONCE_ACTION = 'zcf_checkout_flow';
 		private static $native_card_bootstrap_summary = null;
 
@@ -1873,9 +1873,72 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 				wp_send_json_error( array( 'message' => __( 'This cart still requires a payment method.', 'zen-checkout-flow' ) ) );
 			}
 
-			self::prepare_zencoin_checkout_post_data();
+			$order_result = self::create_zencoin_booking_order();
+
+			if ( is_wp_error( $order_result ) ) {
+				wp_send_json_error( array( 'message' => $order_result->get_error_message() ) );
+			}
+
+			$order_id = isset( $order_result['order_id'] ) ? absint( $order_result['order_id'] ) : 0;
+			$data     = isset( $order_result['data'] ) && is_array( $order_result['data'] ) ? $order_result['data'] : array();
+			$order    = wc_get_order( $order_id );
+
+			if ( ! $order ) {
+				wp_send_json_error( array( 'message' => __( 'Unable to create booking order.', 'zen-checkout-flow' ) ) );
+			}
+
+			try {
+				do_action( 'woocommerce_checkout_order_processed', $order_id, $data, $order );
+			} catch ( Throwable $e ) {
+				wp_send_json_error( array( 'message' => $e->getMessage() ) );
+			}
+
+			if ( $order->get_meta( '_cbb_coins_debited_transaction_id', true ) ) {
+				$order->payment_complete();
+				WC()->cart->empty_cart();
+
+				wp_send_json_success(
+					array(
+						'redirect' => $order->get_checkout_order_received_url(),
+					)
+				);
+			}
+
+			wp_send_json_error( array( 'message' => __( 'Booking could not be completed with Zencoins. Please try again.', 'zen-checkout-flow' ) ) );
+		}
+
+		/**
+		 * Create a Woo order for wallet-only Zencoin booking.
+		 *
+		 * @return array|WP_Error
+		 */
+		private static function create_zencoin_booking_order() {
 			add_filter( 'woocommerce_checkout_fields', array( __CLASS__, 'relax_zencoin_booking_checkout_fields' ), 20 );
-			WC()->checkout()->process_checkout();
+
+			try {
+				$checkout = WC()->checkout();
+				$data     = self::get_zencoin_checkout_data();
+				$order_id = $checkout->create_order( $data );
+
+				if ( is_wp_error( $order_id ) ) {
+					return $order_id;
+				}
+
+				$order = wc_get_order( $order_id );
+
+				if ( ! $order ) {
+					return new WP_Error( 'zcf_order_missing', __( 'Unable to create booking order.', 'zen-checkout-flow' ) );
+				}
+
+				return array(
+					'order_id' => $order_id,
+					'data'     => $data,
+				);
+			} catch ( Throwable $e ) {
+				return new WP_Error( 'zcf_order_error', $e->getMessage() );
+			} finally {
+				remove_filter( 'woocommerce_checkout_fields', array( __CLASS__, 'relax_zencoin_booking_checkout_fields' ), 20 );
+			}
 		}
 
 		/**
@@ -1905,11 +1968,19 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 		/**
 		 * Populate the minimal Woo checkout POST shape for no-payment booking.
 		 *
-		 * @return void
+		 * @return array
 		 */
-		private static function prepare_zencoin_checkout_post_data() {
+		private static function get_zencoin_checkout_data() {
 			$customer_data = self::get_checkout_customer_data();
 			$checkout      = WC()->checkout();
+			$data          = array(
+				'payment_method'            => '',
+				'terms'                     => 1,
+				'terms-field'               => 1,
+				'ship_to_different_address' => false,
+				'createaccount'             => 0,
+				'order_comments'            => '',
+			);
 
 			self::set_synthetic_checkout_post_value( 'woocommerce-process-checkout-nonce', wp_create_nonce( 'woocommerce-process_checkout' ) );
 			self::set_synthetic_checkout_post_value( '_wpnonce', $_POST['woocommerce-process-checkout-nonce'] );
@@ -1925,9 +1996,14 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 
 					if ( isset( $customer_data[ $key ] ) ) {
 						self::set_synthetic_checkout_post_value( $key, $customer_data[ $key ] );
+						$data[ $key ] = $customer_data[ $key ];
+					} else {
+						$data[ $key ] = '';
 					}
 				}
 			}
+
+			return $data;
 		}
 
 		/**
