@@ -153,6 +153,12 @@ body.zcf-popup-open {
 	margin-bottom: 24px;
 }
 
+.zcf-topbar-spacer {
+	display: block;
+	width: 38px;
+	height: 38px;
+}
+
 .zcf-icon-button {
 	width: 38px;
 	height: 38px;
@@ -170,28 +176,18 @@ body.zcf-popup-open {
 }
 
 .zcf-back {
-	position: relative;
+	display: grid;
+	place-items: center;
+	border-radius: 999px;
+	background: rgba(255, 255, 255, 0.03);
+	border: 2px solid rgba(244, 241, 232, 0.14);
 }
 
-.zcf-back::before,
-.zcf-back::after {
-	content: "";
-	position: absolute;
-	left: 7px;
-	top: 18px;
-	height: 2px;
-	border-radius: 4px;
-	background: rgba(244, 241, 232, 0.72);
-}
-
-.zcf-back::before {
-	width: 34px;
-}
-
-.zcf-back::after {
-	width: 16px;
-	transform: rotate(-45deg);
-	transform-origin: left center;
+.zcf-back__glyph {
+	color: rgba(244, 241, 232, 0.88);
+	font-size: 26px;
+	line-height: 1;
+	transform: translateY(-1px);
 }
 
 .zcf-close {
@@ -229,12 +225,27 @@ body.zcf-popup-open {
 	margin: 0 auto;
 }
 
+.zcf-modal[data-zcf-step="choose_plan"] .zcf-grid,
+.zcf-modal[data-zcf-step="shortage_prompt"] .zcf-grid {
+	grid-template-columns: minmax(420px, 1.1fr) minmax(320px, 0.9fr);
+}
+
 .zcf-customer {
 	display: grid;
 	grid-template-columns: 46px minmax(0, 1fr);
 	gap: 14px;
 	align-items: center;
 	margin-bottom: 24px;
+}
+
+.zcf-left--cart-step .zcf-payment-panel {
+	padding: 0;
+	border: 0;
+	background: transparent;
+}
+
+.zcf-right--cart-step .zcf-cart-group {
+	margin-top: 96px;
 }
 
 .zcf-avatar {
@@ -287,12 +298,58 @@ body.zcf-popup-open {
 	background: rgba(25, 28, 26, 0.38);
 }
 
+.zcf-product-card--booking {
+	padding: 24px 26px;
+	border-color: var(--zcf-border);
+	background: rgba(73, 55, 28, 0.12);
+}
+
 .zcf-product-main {
 	display: grid;
 	grid-template-columns: minmax(0, 1fr) auto;
 	gap: 16px;
 	padding-bottom: 16px;
 	border-bottom: 1px solid rgba(244, 241, 232, 0.5);
+}
+
+.zcf-booking-card__head {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	gap: 16px;
+	align-items: start;
+}
+
+.zcf-booking-card__head h3 {
+	margin: 0;
+	font-size: 18px;
+	line-height: 1.35;
+	font-weight: 700;
+}
+
+.zcf-booking-card__coin {
+	width: 62px;
+	height: 62px;
+	display: grid;
+	place-items: center;
+	border: 3px solid var(--zcf-gold);
+	border-radius: 50%;
+	color: var(--zcf-gold);
+	font-size: 20px;
+	font-weight: 700;
+	box-shadow: inset 0 0 0 4px rgba(226, 190, 82, 0.16);
+}
+
+.zcf-booking-card__meta {
+	display: grid;
+	gap: 12px;
+	margin-top: 20px;
+	color: var(--zcf-text);
+}
+
+.zcf-booking-card__row {
+	font-size: 15px;
+	line-height: 1.4;
+	color: rgba(244, 241, 232, 0.9);
 }
 
 .zcf-product-card h3 {
@@ -317,6 +374,52 @@ body.zcf-popup-open {
 	display: block;
 	font-size: 16px;
 	line-height: 1.3;
+}
+
+.zcf-recovery-card {
+	padding: 22px 26px;
+	border: 2px solid rgba(244, 241, 232, 0.62);
+	border-radius: 12px;
+	background: rgba(25, 28, 26, 0.38);
+}
+
+.zcf-recovery-card__head,
+.zcf-recovery-card__subhead {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	gap: 16px;
+	align-items: start;
+}
+
+.zcf-recovery-card__head strong {
+	font-size: 16px;
+	line-height: 1.35;
+}
+
+.zcf-recovery-card__head b,
+.zcf-recovery-card__subhead span:last-child {
+	color: var(--zcf-gold);
+	font-weight: 700;
+}
+
+.zcf-recovery-card__subhead {
+	margin-top: 12px;
+	color: var(--zcf-muted);
+	font-size: 14px;
+	line-height: 1.4;
+}
+
+.zcf-recovery-card__validity {
+	margin-top: 6px;
+	color: var(--zcf-muted);
+	font-size: 14px;
+	line-height: 1.4;
+}
+
+.zcf-recovery-card__divider {
+	height: 1px;
+	margin: 16px 0 0;
+	background: rgba(244, 241, 232, 0.42);
 }
 
 .zcf-product-price span {
@@ -804,71 +907,10 @@ body.zcf-popup-open {
 
 .zcf-recovery-card {
 	position: relative;
-	display: grid;
-	grid-template-columns: minmax(0, 1fr) auto 36px;
-	gap: 12px;
-	align-items: center;
-	min-height: 96px;
-	padding: 16px 12px;
-	border: 2px solid rgba(244, 241, 232, 0.58);
-	border-radius: 8px;
+	display: block;
 	background:
 		radial-gradient(circle at 88% 12%, rgba(226, 190, 82, 0.13), transparent 26%),
 		rgba(29, 31, 27, 0.52);
-}
-
-.zcf-recovery-card__main,
-.zcf-recovery-card__side {
-	display: grid;
-	gap: 6px;
-	min-width: 0;
-}
-
-.zcf-recovery-card__main strong {
-	color: var(--zcf-text);
-	font-size: 15px;
-	line-height: 1.25;
-	font-weight: 800;
-}
-
-.zcf-recovery-card__main span,
-.zcf-recovery-card__side span {
-	color: var(--zcf-muted);
-	font-size: 12px;
-	line-height: 1.35;
-}
-
-.zcf-recovery-card__side {
-	text-align: right;
-}
-
-.zcf-recovery-card__side b {
-	color: var(--zcf-gold);
-	font-size: 14px;
-	line-height: 1.25;
-}
-
-.zcf-recovery-card__side span {
-	color: var(--zcf-gold);
-	font-weight: 800;
-}
-
-.zcf-recovery-card__add {
-	width: 32px;
-	height: 32px;
-	border: 0;
-	padding: 0;
-	background: transparent;
-	color: var(--zcf-gold);
-	font-size: 34px;
-	line-height: 1;
-	cursor: pointer;
-}
-
-.zcf-recovery-card__add:hover,
-.zcf-recovery-card__add:focus-visible {
-	color: var(--zcf-text);
-	outline: none;
 }
 
 .zcf-applied-coupons {
@@ -1326,13 +1368,8 @@ body.zcf-popup-open {
 		top: 18px;
 	}
 
-	.zcf-back::before,
-	.zcf-back::after {
-		top: 23px;
-	}
-
-	.zcf-back::before {
-		width: 42px;
+	.zcf-back__glyph {
+		font-size: 28px;
 	}
 
 	.zcf-grid {
