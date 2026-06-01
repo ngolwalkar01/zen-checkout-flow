@@ -308,10 +308,20 @@
 		}
 	}
 
-	function closePopup() {
+	function shouldRedirectHomeOnClose() {
+		return !!zcfCheckout.popupOwnsRoute && !!zcfCheckout.homeUrl;
+	}
+
+	function closePopup(options) {
+		options = options || {};
+
 		parkPersistentCheckoutHost();
 		getPopup().removeClass('is-active').attr('aria-hidden', 'true');
 		$('body').removeClass('zcf-popup-open');
+
+		if (!options.suppressRedirect && shouldRedirectHomeOnClose()) {
+			window.location.href = zcfCheckout.homeUrl;
+		}
 	}
 
 	function getShellStep($scope) {
@@ -450,7 +460,7 @@
 
 	$(document).on('click', '[data-zcf-login]', function () {
 		if (openThemeLoginPopup()) {
-			closePopup();
+			closePopup({ suppressRedirect: true });
 		}
 	});
 
@@ -466,11 +476,11 @@
 
 		if (action === 'schedule') {
 			$(document).trigger('zenCheckoutFlow:schedule');
-			closePopup();
+			closePopup({ suppressRedirect: true });
 			return;
 		}
 
-		closePopup();
+		closePopup({ suppressRedirect: true });
 	});
 
 	$(document).on('click', '[data-zcf-close]', function () {
