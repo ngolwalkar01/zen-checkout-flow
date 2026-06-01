@@ -326,17 +326,57 @@ body.zcf-popup-open {
 	font-weight: 700;
 }
 
-.zcf-booking-card__coin {
+.zcf-zencoin-badge {
 	width: 62px;
 	height: 62px;
 	display: grid;
 	place-items: center;
+	position: relative;
 	border: 3px solid var(--zcf-gold);
 	border-radius: 50%;
-	color: var(--zcf-gold);
+	background: var(--zcf-gold);
+	color: #3f3f42;
+	flex: 0 0 auto;
 	font-size: 20px;
 	font-weight: 700;
+	line-height: 1;
+}
+
+.zcf-zencoin-badge__ring {
+	position: absolute;
+	inset: 8px;
+	border: 3px solid #3f3f42;
+	border-radius: 50%;
+	pointer-events: none;
+}
+
+.zcf-zencoin-badge__value {
+	position: relative;
+	z-index: 1;
+}
+
+.zcf-zencoin-badge--small {
+	width: 44px;
+	height: 44px;
+	border-width: 2px;
+	font-size: 18px;
+}
+
+.zcf-zencoin-badge--small .zcf-zencoin-badge__ring {
+	inset: 6px;
+	border-width: 2px;
+}
+
+.zcf-zencoin-badge--booking {
+	width: 62px;
+	height: 62px;
+	background: transparent;
+	color: var(--zcf-gold);
 	box-shadow: inset 0 0 0 4px rgba(226, 190, 82, 0.16);
+}
+
+.zcf-zencoin-badge--booking .zcf-zencoin-badge__ring {
+	border-color: var(--zcf-gold);
 }
 
 .zcf-booking-card__meta {
@@ -347,9 +387,34 @@ body.zcf-popup-open {
 }
 
 .zcf-booking-card__row {
+	display: flex;
+	align-items: center;
+	gap: 14px;
 	font-size: 15px;
 	line-height: 1.4;
 	color: rgba(244, 241, 232, 0.9);
+}
+
+.zcf-booking-card__icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 28px;
+	min-width: 28px;
+	color: var(--zcf-gold);
+}
+
+.zcf-booking-card__icon svg {
+	display: block;
+	width: 24px;
+	height: 24px;
+}
+
+.zcf-booking-card__instructor {
+	padding-left: 42px;
+	color: var(--zcf-muted);
+	font-size: 15px;
+	line-height: 1.35;
 }
 
 .zcf-product-card h3 {
@@ -362,6 +427,13 @@ body.zcf-popup-open {
 .zcf-product-meta {
 	font-size: 14px;
 	line-height: 1.45;
+}
+
+.zcf-product-validity {
+	margin-top: 4px;
+	color: var(--zcf-muted);
+	font-size: 14px;
+	line-height: 1.4;
 }
 
 .zcf-product-price {
@@ -431,6 +503,39 @@ body.zcf-popup-open {
 	opacity: 0.72;
 }
 
+.zcf-product-zencoins,
+.zcf-recovery-card__zencoins {
+	display: inline-flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 8px;
+	color: var(--zcf-gold);
+	font-weight: 800;
+	white-space: nowrap;
+}
+
+.zcf-product-price .zcf-product-zencoins span,
+.zcf-product-price .zcf-zencoin-badge,
+.zcf-product-price .zcf-zencoin-badge span {
+	margin-top: 0;
+	color: inherit;
+	opacity: 1;
+}
+
+.zcf-product-price .zcf-zencoin-badge {
+	display: grid;
+	color: #3f3f42;
+}
+
+.zcf-product-price .zcf-zencoin-badge__ring,
+.zcf-product-price .zcf-zencoin-badge__value {
+	display: block;
+}
+
+.zcf-recovery-card__zencoins {
+	justify-content: flex-start;
+}
+
 .zcf-product-cta,
 .zcf-pay-button,
 .zcf-coupon button {
@@ -454,6 +559,19 @@ body.zcf-popup-open {
 .zcf-pay-button:hover,
 .zcf-coupon button:hover {
 	background: #edca60;
+}
+
+.zcf-product-cta--remove {
+	background: transparent;
+	border: 2px solid rgba(244, 241, 232, 0.68);
+	color: var(--zcf-text);
+	box-shadow: none;
+}
+
+.zcf-product-cta--remove:hover {
+	border-color: var(--zcf-gold);
+	background: rgba(226, 190, 82, 0.12);
+	color: var(--zcf-gold);
 }
 
 .zcf-more {

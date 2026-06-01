@@ -3,6 +3,7 @@
 
 	var currentStep = 'auto';
 	var stepHistory = [];
+	var popupHistoryArmed = false;
 
 	function setLoading($shell, isLoading) {
 		$shell.toggleClass('is-loading', !!isLoading);
@@ -10,6 +11,14 @@
 
 	function updateFragments($shell, data) {
 		parkPersistentCheckoutHost();
+
+		if (Object.prototype.hasOwnProperty.call(data, 'html')) {
+			$shell.replaceWith(data.html);
+			currentStep = data.step || getShellStep(getPopupStage()) || currentStep;
+			attachPersistentCheckoutHost(getPopupStage());
+			clearStaleCoinBalanceNotices(getPopupStage());
+			return;
+		}
 
 		if (Object.prototype.hasOwnProperty.call(data, 'cartItems')) {
 			$shell.find('[data-zcf-cart-items]').html(data.cartItems);
@@ -252,6 +261,7 @@
 
 		$popup.addClass('is-active').attr('aria-hidden', 'false');
 		$('body').addClass('zcf-popup-open');
+		armPopupHistory();
 		hasShell = $stage.find('[data-zcf-checkout-flow]').length > 0;
 
 		if (!hasShell) {
@@ -312,6 +322,19 @@
 		return !!zcfCheckout.popupOwnsRoute && !!zcfCheckout.homeUrl;
 	}
 
+	function armPopupHistory() {
+		if (!window.history || typeof window.history.pushState !== 'function') {
+			return;
+		}
+
+		try {
+			window.history.pushState({ zcfPopup: true, zcfStep: currentStep || 'auto' }, document.title, window.location.href);
+			popupHistoryArmed = true;
+		} catch (error) {
+			popupHistoryArmed = false;
+		}
+	}
+
 	function closePopup(options) {
 		options = options || {};
 
@@ -363,14 +386,26 @@
 			});
 	}
 
+	function removeCartItem($button) {
+		var $shell = $button.closest('[data-zcf-checkout-flow]');
+
+		return request($shell, 'zcf_remove_cart_item', {
+			cart_item_key: $button.data('zcf-remove-cart-item') || ''
+		});
+	}
+
 	function goBackStep() {
 		var previousStep = stepHistory.pop();
 		var $stage = getPopupStage();
 		var $shell = $stage.find('[data-zcf-checkout-flow]').first();
 
 		if (!previousStep) {
-			closePopup();
-			return;
+			if (currentStep === 'payment' || getShellStep($stage) === 'payment') {
+				previousStep = 'choose_plan';
+			} else {
+				closePopup();
+				return;
+			}
 		}
 
 		if (currentStep === 'payment') {
@@ -448,6 +483,10 @@
 
 	$(document).on('click', '[data-zcf-add-recovery-product]', function () {
 		addRecoveryProduct($(this));
+	});
+
+	$(document).on('click', '[data-zcf-remove-cart-item]', function () {
+		removeCartItem($(this));
 	});
 
 	$(document).on('click', '[data-zcf-back]', function () {
@@ -530,6 +569,18 @@
 	$(document).on('keydown', function (event) {
 		if (event.key === 'Escape' && getPopup().hasClass('is-active')) {
 			closePopup();
+		}
+	});
+
+	$(window).on('popstate', function () {
+		if (!popupHistoryArmed || !getPopup().hasClass('is-active')) {
+			return;
+		}
+
+		goBackStep();
+
+		if (getPopup().hasClass('is-active')) {
+			armPopupHistory();
 		}
 	});
 })(jQuery);

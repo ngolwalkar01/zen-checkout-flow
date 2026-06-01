@@ -42,6 +42,7 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			add_action( 'wp_ajax_zcf_refresh_checkout', array( __CLASS__, 'ajax_refresh_checkout' ) );
 			add_action( 'wp_ajax_zcf_apply_coupon', array( __CLASS__, 'ajax_apply_coupon' ) );
 			add_action( 'wp_ajax_zcf_remove_coupon', array( __CLASS__, 'ajax_remove_coupon' ) );
+			add_action( 'wp_ajax_zcf_remove_cart_item', array( __CLASS__, 'ajax_remove_cart_item' ) );
 			add_action( 'wp_ajax_zcf_choose_payment_method', array( __CLASS__, 'ajax_choose_payment_method' ) );
 			add_action( 'wp_ajax_zcf_book_with_zencoins', array( __CLASS__, 'ajax_book_with_zencoins' ) );
 			add_action( 'wp_ajax_zcf_add_recovery_product', array( __CLASS__, 'ajax_add_recovery_product' ) );
@@ -1030,7 +1031,9 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 				return '';
 			}
 
-			$quantity = max( 1, (int) $cart_item['quantity'] );
+			$quantity       = max( 1, (int) $cart_item['quantity'] );
+			$zencoin_grant  = self::get_product_zencoin_grant_label( $product );
+			$validity_label = self::get_product_zencoin_validity_label( $product );
 
 			ob_start();
 			?>
@@ -1039,15 +1042,25 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 					<div>
 						<h3><?php echo esc_html( $product->get_name() ); ?></h3>
 						<?php echo self::render_product_meta( $cart_item ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+						<?php if ( $validity_label ) : ?>
+							<div class="zcf-product-validity"><?php echo esc_html( $validity_label ); ?></div>
+						<?php endif; ?>
 					</div>
 					<div class="zcf-product-price">
 						<strong><?php echo wp_kses_post( WC()->cart->get_product_subtotal( $product, $quantity ) ); ?></strong>
-						<?php echo self::render_price_suffix( $product ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+						<?php if ( '' !== $zencoin_grant ) : ?>
+							<div class="zcf-product-zencoins">
+								<span><?php esc_html_e( 'ZENCOINS:', 'zen-checkout-flow' ); ?></span>
+								<?php echo self::render_zencoin_badge( $zencoin_grant, 'zcf-zencoin-badge--small' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+							</div>
+						<?php else : ?>
+							<?php echo self::render_price_suffix( $product ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+						<?php endif; ?>
 					</div>
 				</div>
 
-				<button type="button" class="zcf-product-cta" data-zcf-to-payment>
-					<?php esc_html_e( 'To Payment', 'zen-checkout-flow' ); ?>
+				<button type="button" class="zcf-product-cta zcf-product-cta--remove" data-zcf-remove-cart-item="<?php echo esc_attr( $cart_item_key ); ?>">
+					<?php esc_html_e( 'Remove', 'zen-checkout-flow' ); ?>
 				</button>
 
 				<details class="zcf-more">
@@ -1084,22 +1097,25 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 				<div class="zcf-booking-card__head">
 					<h3><?php echo esc_html( $product->get_name() ); ?></h3>
 					<?php if ( '' !== $summary['zencoins'] ) : ?>
-						<div class="zcf-booking-card__coin"><?php echo esc_html( $summary['zencoins'] ); ?></div>
+						<?php echo self::render_zencoin_badge( $summary['zencoins'], 'zcf-zencoin-badge--booking' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 					<?php endif; ?>
 				</div>
 
 				<div class="zcf-booking-card__meta">
 					<?php if ( $summary['date'] ) : ?>
-						<div class="zcf-booking-card__row"><span><?php echo esc_html( $summary['date'] ); ?></span></div>
+						<div class="zcf-booking-card__row"><?php echo self::render_booking_meta_icon( 'date' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?><span><?php echo esc_html( $summary['date'] ); ?></span></div>
 					<?php endif; ?>
 					<?php if ( $summary['timeslot'] ) : ?>
-						<div class="zcf-booking-card__row"><span><?php echo esc_html( $summary['timeslot'] ); ?></span></div>
+						<div class="zcf-booking-card__row"><?php echo self::render_booking_meta_icon( 'time' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?><span><?php echo esc_html( $summary['timeslot'] ); ?></span></div>
 					<?php endif; ?>
 					<?php if ( $summary['space'] ) : ?>
-						<div class="zcf-booking-card__row"><span><?php echo esc_html( $summary['space'] ); ?></span></div>
+						<div class="zcf-booking-card__row"><?php echo self::render_booking_meta_icon( 'space' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?><span><?php echo esc_html( $summary['space'] ); ?></span></div>
 					<?php endif; ?>
 					<?php if ( $summary['type'] ) : ?>
-						<div class="zcf-booking-card__row"><span><?php echo esc_html( $summary['type'] ); ?></span></div>
+						<div class="zcf-booking-card__row"><?php echo self::render_booking_meta_icon( 'type' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?><span><?php echo esc_html( $summary['type'] ); ?></span></div>
+					<?php endif; ?>
+					<?php if ( $summary['instructor'] ) : ?>
+						<div class="zcf-booking-card__instructor"><?php echo esc_html( $summary['instructor'] ); ?></div>
 					<?php endif; ?>
 				</div>
 			</article>
@@ -1139,10 +1155,22 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			$end         = 0;
 			$resource_id = 0;
 
+			if ( is_array( $booking ) && ! empty( $booking['_booking_id'] ) && function_exists( 'get_wc_booking' ) ) {
+				$booking_object = get_wc_booking( absint( $booking['_booking_id'] ) );
+
+				if ( $booking_object ) {
+					$booking = $booking_object;
+				}
+			}
+
 			if ( is_object( $booking ) ) {
 				$start       = method_exists( $booking, 'get_start' ) ? (int) $booking->get_start( 'edit' ) : 0;
 				$end         = method_exists( $booking, 'get_end' ) ? (int) $booking->get_end( 'edit' ) : 0;
 				$resource_id = method_exists( $booking, 'get_resource_id' ) ? (int) $booking->get_resource_id( 'edit' ) : 0;
+			} elseif ( is_array( $booking ) ) {
+				$start       = ! empty( $booking['_start_date'] ) ? strtotime( (string) $booking['_start_date'] ) : 0;
+				$end         = ! empty( $booking['_end_date'] ) ? strtotime( (string) $booking['_end_date'] ) : 0;
+				$resource_id = ! empty( $booking['_resource_id'] ) ? absint( $booking['_resource_id'] ) : 0;
 			}
 
 			$date_format = function_exists( 'wc_bookings_date_format' ) ? wc_bookings_date_format() : get_option( 'date_format' );
@@ -1155,6 +1183,11 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 
 				if ( $end && $end > $start ) {
 					$time .= ' - ' . date_i18n( $time_format, $end );
+					$duration_minutes = (int) round( ( $end - $start ) / MINUTE_IN_SECONDS );
+
+					if ( $duration_minutes > 0 ) {
+						$time .= ' (' . sprintf( _n( '%dmin', '%dmin', $duration_minutes, 'zen-checkout-flow' ), $duration_minutes ) . ')';
+					}
 				}
 			}
 
@@ -1163,6 +1196,7 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 				'timeslot'  => $time,
 				'space'     => $resource_id ? get_the_title( $resource_id ) : '',
 				'type'      => self::get_booking_type_label( $product ),
+				'instructor' => self::get_booking_instructor_label( $product ),
 				'zencoins'  => self::get_booking_coin_cost_label( $product ),
 			);
 		}
@@ -1178,7 +1212,7 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 				return '';
 			}
 
-			$taxonomies = array( 'experience_category', 'activity_type', 'product_cat' );
+			$taxonomies = array( 'space_type', 'experience_category', 'activity_type', 'product_cat' );
 
 			foreach ( $taxonomies as $taxonomy ) {
 				$terms = get_the_terms( $product->get_id(), $taxonomy );
@@ -1219,6 +1253,123 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 		}
 
 		/**
+		 * Get instructor/teacher label used by booking cards.
+		 *
+		 * @param WC_Product|false $product Product.
+		 * @return string
+		 */
+		private static function get_booking_instructor_label( $product ) {
+			if ( ! $product instanceof WC_Product ) {
+				return '';
+			}
+
+			foreach ( array( '_zen_instructor', 'zen_instructor', '_instructor', 'instructor' ) as $meta_key ) {
+				$value = trim( (string) get_post_meta( $product->get_id(), $meta_key, true ) );
+
+				if ( '' !== $value ) {
+					return $value;
+				}
+			}
+
+			return '';
+		}
+
+		/**
+		 * Render a Zencoin badge only when a coin amount is available.
+		 *
+		 * @param string $value       Coin amount.
+		 * @param string $extra_class Extra CSS class.
+		 * @return string
+		 */
+		private static function render_zencoin_badge( $value, $extra_class = '' ) {
+			$value = trim( (string) $value );
+
+			if ( '' === $value ) {
+				return '';
+			}
+
+			return '<span class="' . esc_attr( trim( 'zcf-zencoin-badge ' . $extra_class ) ) . '" aria-hidden="true"><span class="zcf-zencoin-badge__ring"></span><span class="zcf-zencoin-badge__value">' . esc_html( $value ) . '</span></span>';
+		}
+
+		/**
+		 * Render booking meta icons copied from zen-bookpro.
+		 *
+		 * @param string $icon Icon key.
+		 * @return string
+		 */
+		private static function render_booking_meta_icon( $icon ) {
+			$icons = array(
+				'date'  => '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M7 2a1 1 0 0 1 1 1v1h8V3a1 1 0 1 1 2 0v1h1a3 3 0 0 1 3 3v2H2V7a3 3 0 0 1 3-3h1V3a1 1 0 0 1 1-1Zm15 9v8a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3v-8h20Z"/></svg>',
+				'time'  => '<svg width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="currentColor"/><path d="M12 7v5h5" stroke="#3f3f42" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>',
+				'space' => '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M10 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h5V3Zm2 0v18h7a2 2 0 0 0 2-2V8.414a2 2 0 0 0-.586-1.414l-3.414-3.414A2 2 0 0 0 15.586 3H12Z"/></svg>',
+				'type'  => '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M10 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h5V3Zm2 0v18h7a2 2 0 0 0 2-2V8.414a2 2 0 0 0-.586-1.414l-3.414-3.414A2 2 0 0 0 15.586 3H12Z"/></svg>',
+			);
+
+			return isset( $icons[ $icon ] ) ? '<span class="zcf-booking-card__icon" aria-hidden="true">' . $icons[ $icon ] . '</span>' : '';
+		}
+
+		/**
+		 * Get granted Zencoins for purchasable products.
+		 *
+		 * @param WC_Product $product Product.
+		 * @return string
+		 */
+		private static function get_product_zencoin_grant_label( $product ) {
+			if ( ! $product instanceof WC_Product ) {
+				return '';
+			}
+
+			$product_id = $product->get_id();
+			$parent_id  = $product->is_type( 'variation' ) ? $product->get_parent_id() : $product_id;
+			$amount     = (float) get_post_meta( $product_id, '_cbb_zencoin_grant_amount', true );
+
+			if ( $amount <= 0 ) {
+				$amount = (float) get_post_meta( $product_id, '_cbb_coin_grant_amount', true );
+			}
+
+			if ( $amount <= 0 ) {
+				$amount = (float) get_post_meta( $product_id, '_zen_coins', true );
+			}
+
+			if ( $amount <= 0 && $parent_id !== $product_id ) {
+				$amount = (float) get_post_meta( $parent_id, '_cbb_zencoin_grant_amount', true );
+			}
+
+			return $amount > 0 ? wc_format_decimal( $amount, 0 ) : '';
+		}
+
+		/**
+		 * Get validity text for Zencoin products.
+		 *
+		 * @param WC_Product $product Product.
+		 * @return string
+		 */
+		private static function get_product_zencoin_validity_label( $product ) {
+			if ( ! $product instanceof WC_Product ) {
+				return '';
+			}
+
+			$product_id = $product->get_id();
+			$parent_id  = $product->is_type( 'variation' ) ? $product->get_parent_id() : $product_id;
+			$days       = (int) get_post_meta( $product_id, '_cbb_zencoin_validity_days', true );
+
+			if ( $days <= 0 && $parent_id !== $product_id ) {
+				$days = (int) get_post_meta( $parent_id, '_cbb_zencoin_validity_days', true );
+			}
+
+			if ( $days <= 0 ) {
+				return '';
+			}
+
+			if ( 0 === $days % 30 ) {
+				$months = max( 1, (int) round( $days / 30 ) );
+				return sprintf( _n( 'Valid for %d Month', 'Valid for %d Months', $months, 'zen-checkout-flow' ), $months );
+			}
+
+			return sprintf( _n( 'Valid for %d Day', 'Valid for %d Days', $days, 'zen-checkout-flow' ), $days );
+		}
+
+		/**
 		 * Render product meta line.
 		 *
 		 * @param array $cart_item Cart item.
@@ -1247,7 +1398,7 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 				);
 			}
 
-			return '<div class="zcf-product-meta">' . esc_html( implode( ' · ', $lines ) ) . '</div>';
+			return '<div class="zcf-product-meta">' . esc_html( implode( ' / ', $lines ) ) . '</div>';
 		}
 
 		/**
@@ -1465,7 +1616,10 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 						</div>
 						<div class="zcf-recovery-card__subhead">
 							<span><?php echo esc_html( $offer['eur_per_zencoin_label'] ); ?></span>
-							<span><?php esc_html_e( 'ZENCOINS:', 'zen-checkout-flow' ); ?> <?php echo esc_html( $offer['zencoins_label'] ); ?></span>
+							<span class="zcf-recovery-card__zencoins">
+								<?php esc_html_e( 'ZENCOINS:', 'zen-checkout-flow' ); ?>
+								<?php echo self::render_zencoin_badge( $offer['zencoins_label'], 'zcf-zencoin-badge--small' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+							</span>
 						</div>
 						<div class="zcf-recovery-card__validity"><?php echo esc_html( $offer['validity_label'] ); ?></div>
 						<div class="zcf-recovery-card__divider"></div>
@@ -2076,12 +2230,12 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			$step = self::normalize_step( $step );
 			$mode = isset( $context['mode'] ) ? $context['mode'] : 'money_purchase';
 
-			if ( in_array( $mode, array( 'money_purchase', 'mixed_recovery', 'zencoin_booking' ), true ) ) {
-				return 'payment';
-			}
-
 			if ( in_array( $step, array( 'choose_plan', 'shortage_prompt' ), true ) ) {
 				return $step;
+			}
+
+			if ( in_array( $mode, array( 'money_purchase', 'mixed_recovery', 'zencoin_booking' ), true ) ) {
+				return 'payment';
 			}
 
 			$available = isset( $context['available_zencoins'] ) ? (float) $context['available_zencoins'] : 0.0;
@@ -2453,6 +2607,37 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 
 			WC()->cart->remove_coupon( $coupon_code );
 			WC()->cart->calculate_totals();
+
+			self::send_fragments();
+		}
+
+		/**
+		 * Remove a cart item.
+		 */
+		public static function ajax_remove_cart_item() {
+			self::verify_ajax();
+
+			if ( ! WC()->cart ) {
+				wp_send_json_error( array( 'message' => __( 'Your cart is unavailable.', 'zen-checkout-flow' ) ) );
+			}
+
+			$cart_item_key = isset( $_POST['cart_item_key'] ) ? wc_clean( wp_unslash( $_POST['cart_item_key'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Missing
+
+			if ( '' === $cart_item_key || ! isset( WC()->cart->cart_contents[ $cart_item_key ] ) ) {
+				wp_send_json_error( array( 'message' => __( 'This cart item could not be found.', 'zen-checkout-flow' ) ) );
+			}
+
+			WC()->cart->remove_cart_item( $cart_item_key );
+			WC()->cart->calculate_totals();
+
+			if ( WC()->cart->is_empty() ) {
+				wp_send_json_success(
+					array(
+						'html' => self::render_shell( '', 'auto' ),
+						'step' => 'auto',
+					)
+				);
+			}
 
 			self::send_fragments();
 		}
