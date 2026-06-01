@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Zen Checkout Flow
  * Description: Popup-based WooCommerce checkout/cart flow for logged-in customers.
- * Version: 0.1.42
+ * Version: 0.1.43
  * Author: Custom
  * Text Domain: zen-checkout-flow
  *
@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
 if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 	final class ZCF_Zen_Checkout_Flow {
 
-		const VERSION = '0.1.42';
+		const VERSION = '0.1.43';
 		const NONCE_ACTION = 'zcf_checkout_flow';
 		private static $native_card_bootstrap_summary = null;
 
@@ -32,7 +32,9 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			add_shortcode( 'zen_checkout_flow', array( __CLASS__, 'render_shortcode' ) );
 
 			add_action( 'wp_enqueue_scripts', array( __CLASS__, 'register_assets' ) );
+			add_action( 'template_redirect', array( __CLASS__, 'maybe_redirect_native_checkout_route' ), 5 );
 			add_action( 'wp_footer', array( __CLASS__, 'render_popup_root' ) );
+			add_filter( 'body_class', array( __CLASS__, 'filter_body_class' ) );
 			add_filter( 'woocommerce_available_payment_gateways', array( __CLASS__, 'filter_popup_payment_gateways' ), 50 );
 			add_filter( 'woocommerce_add_to_cart_redirect', array( __CLASS__, 'redirect_add_to_cart_to_popup' ), 20, 2 );
 			add_action( 'wp_ajax_zcf_render_checkout', array( __CLASS__, 'ajax_render_checkout' ) );
@@ -207,6 +209,27 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 		}
 
 		/**
+		 * Whether the current frontend route should be visually owned by the popup.
+		 *
+		 * @return bool
+		 */
+		private static function is_popup_owned_route() {
+			if ( ! self::dependencies_loaded() ) {
+				return false;
+			}
+
+			if ( function_exists( 'is_cart' ) && is_cart() ) {
+				return true;
+			}
+
+			if ( self::get_mixed_recovery_result_from_request() ) {
+				return true;
+			}
+
+			return isset( $_GET['zcf_open_checkout'] ) && '1' === wc_clean( wp_unslash( $_GET['zcf_open_checkout'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		}
+
+		/**
 		 * Whether we are on the native checkout page where Woo already owns the checkout runtime.
 		 *
 		 * @return bool
@@ -222,6 +245,61 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 		}
 
 		/**
+		 * Redirect direct access to the native checkout page into the popup-owned flow.
+		 *
+		 * Order-pay and order-received routes are left alone for now because the
+		 * project still relies on Woo order context there.
+		 *
+		 * @return void
+		 */
+		public static function maybe_redirect_native_checkout_route() {
+			if ( is_admin() || wp_doing_ajax() || ! self::dependencies_loaded() ) {
+				return;
+			}
+
+			if ( ! self::is_native_checkout_page() ) {
+				return;
+			}
+
+			if ( function_exists( 'is_wc_endpoint_url' ) && ( is_wc_endpoint_url( 'order-pay' ) || is_wc_endpoint_url( 'order-received' ) ) ) {
+				return;
+			}
+
+			$target = wc_get_cart_url();
+
+			if ( ! $target ) {
+				return;
+			}
+
+			wp_safe_redirect(
+				add_query_arg(
+					'zcf_open_checkout',
+					'1',
+					remove_query_arg( 'zcf_open_checkout', $target )
+				)
+			);
+			exit;
+		}
+
+		/**
+		 * Add route-awareness classes for popup-owned checkout surfaces.
+		 *
+		 * @param array $classes Existing body classes.
+		 * @return array
+		 */
+		public static function filter_body_class( $classes ) {
+			if ( self::is_popup_owned_route() ) {
+				$classes[] = 'zcf-owned-checkout-route';
+			}
+
+			if ( self::is_native_checkout_page() ) {
+				$classes[] = 'zcf-native-checkout-route';
+			}
+
+			return $classes;
+		}
+
+		/**
 		 * Render the plugin-owned popup mount point.
 		 */
 		public static function render_popup_root() {
@@ -230,7 +308,7 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			}
 
 			?>
-			<div id="zcf-popup" class="zcf-popup" aria-hidden="true">
+			<div id="zcf-popup" class="zcf-popup<?php echo self::is_popup_owned_route() ? ' zcf-popup--owned-route' : ''; ?>" aria-hidden="true">
 				<div class="zcf-popup-backdrop" data-zcf-popup-close></div>
 				<div class="zcf-popup-stage" data-zcf-popup-stage>
 					<div class="zcf-popup-loading" data-zcf-popup-loading><?php esc_html_e( 'Loading checkout...', 'zen-checkout-flow' ); ?></div>

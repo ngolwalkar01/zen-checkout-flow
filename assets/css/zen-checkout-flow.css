@@ -45,6 +45,12 @@ body.zcf-popup-open {
 	-webkit-backdrop-filter: blur(18px);
 }
 
+.zcf-popup--owned-route .zcf-popup-backdrop {
+	background: rgba(16, 16, 16, 0.96);
+	backdrop-filter: none;
+	-webkit-backdrop-filter: none;
+}
+
 .zcf-popup-stage {
 	position: relative;
 	z-index: 1;
