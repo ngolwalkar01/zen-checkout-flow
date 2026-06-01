@@ -1051,7 +1051,7 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 						<?php if ( '' !== $zencoin_grant ) : ?>
 							<div class="zcf-product-zencoins">
 								<span><?php esc_html_e( 'ZENCOINS:', 'zen-checkout-flow' ); ?></span>
-								<?php echo self::render_zencoin_badge( $zencoin_grant, 'zcf-zencoin-badge--small' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+								<?php echo self::render_zencoin_badge( $zencoin_grant ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 							</div>
 						<?php else : ?>
 							<?php echo self::render_price_suffix( $product ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
@@ -1097,7 +1097,7 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 				<div class="zcf-booking-card__head">
 					<h3><?php echo esc_html( $product->get_name() ); ?></h3>
 					<?php if ( '' !== $summary['zencoins'] ) : ?>
-						<?php echo self::render_zencoin_badge( $summary['zencoins'], 'zcf-zencoin-badge--booking' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+						<?php echo self::render_zencoin_badge( $summary['zencoins'] ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 					<?php endif; ?>
 				</div>
 
@@ -1278,17 +1278,16 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 		 * Render a Zencoin badge only when a coin amount is available.
 		 *
 		 * @param string $value       Coin amount.
-		 * @param string $extra_class Extra CSS class.
 		 * @return string
 		 */
-		private static function render_zencoin_badge( $value, $extra_class = '' ) {
+		private static function render_zencoin_badge( $value ) {
 			$value = trim( (string) $value );
 
 			if ( '' === $value ) {
 				return '';
 			}
 
-			return '<span class="' . esc_attr( trim( 'zcf-zencoin-badge ' . $extra_class ) ) . '" aria-hidden="true"><span class="zcf-zencoin-badge__ring"></span><span class="zcf-zencoin-badge__value">' . esc_html( $value ) . '</span></span>';
+			return '<span class="zen-coin-global zen-coin-global--replaced" aria-hidden="true"><span class="zen-coin-global__ring"></span><span class="zen-coin-global__value">' . esc_html( $value ) . '</span></span>';
 		}
 
 		/**
@@ -1618,7 +1617,7 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 							<span><?php echo esc_html( $offer['eur_per_zencoin_label'] ); ?></span>
 							<span class="zcf-recovery-card__zencoins">
 								<?php esc_html_e( 'ZENCOINS:', 'zen-checkout-flow' ); ?>
-								<?php echo self::render_zencoin_badge( $offer['zencoins_label'], 'zcf-zencoin-badge--small' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+								<?php echo self::render_zencoin_badge( $offer['zencoins_label'] ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 							</span>
 						</div>
 						<div class="zcf-recovery-card__validity"><?php echo esc_html( $offer['validity_label'] ); ?></div>
