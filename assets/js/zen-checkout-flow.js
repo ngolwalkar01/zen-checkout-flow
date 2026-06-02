@@ -78,6 +78,29 @@
 			return;
 		}
 
+		function dispatchBlocksRenderEvent() {
+			var checkoutBlock = $host.find('.wp-block-woocommerce-checkout').get(0);
+			var event;
+
+			if (!checkoutBlock || $host.data('zcfBlocksRenderEventDispatched')) {
+				return;
+			}
+
+			$host.data('zcfBlocksRenderEventDispatched', true);
+
+			try {
+				event = new CustomEvent('wc-blocks_render_blocks_frontend', {
+					bubbles: true,
+					cancelable: false
+				});
+			} catch (error) {
+				event = document.createEvent('Event');
+				event.initEvent('wc-blocks_render_blocks_frontend', true, false);
+			}
+
+			checkoutBlock.dispatchEvent(event);
+		}
+
 		window.setTimeout(function () {
 			try {
 				window.dispatchEvent(new Event('resize'));
@@ -87,6 +110,7 @@
 				window.dispatchEvent(resizeEvent);
 			}
 
+			dispatchBlocksRenderEvent();
 			$host.trigger('zcf:native-payment-host-attached');
 		}, 50);
 	}
