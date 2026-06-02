@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Zen Checkout Flow
  * Description: Popup-based WooCommerce checkout/cart flow for logged-in customers.
- * Version: 0.1.60
+ * Version: 0.1.61
  * Author: Custom
  * Text Domain: zen-checkout-flow
  *
@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
 if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 	final class ZCF_Zen_Checkout_Flow {
 
-		const VERSION = '0.1.60';
+		const VERSION = '0.1.61';
 		const NONCE_ACTION = 'zcf_checkout_flow';
 		private static $native_card_bootstrap_summary = null;
 
@@ -1913,9 +1913,9 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 		 */
 		private static function get_checkout_block_stub_markup() {
 			return '<!-- wp:woocommerce/checkout -->
-<div class="wp-block-woocommerce-checkout alignwide wc-block-checkout is-loading"><!-- wp:woocommerce/checkout-fields-block -->
-<div class="wp-block-woocommerce-checkout-fields-block"><!-- wp:woocommerce/checkout-express-payment-block -->
-<div class="wp-block-woocommerce-checkout-express-payment-block"></div>
+<div data-block-name="woocommerce/checkout" class="wp-block-woocommerce-checkout alignwide wc-block-checkout is-loading"><!-- wp:woocommerce/checkout-fields-block -->
+<div data-block-name="woocommerce/checkout-fields-block" class="wp-block-woocommerce-checkout-fields-block"><!-- wp:woocommerce/checkout-express-payment-block -->
+<div data-block-name="woocommerce/checkout-express-payment-block" class="wp-block-woocommerce-checkout-express-payment-block"></div>
 <!-- /wp:woocommerce/checkout-express-payment-block -->
 
 <!-- wp:woocommerce/checkout-contact-information-block -->
