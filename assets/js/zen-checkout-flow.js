@@ -804,12 +804,8 @@
 		var $shell = $stage.find('[data-zcf-checkout-flow]').first();
 
 		if (!previousStep) {
-			if (currentStep === 'payment' || getShellStep($stage) === 'payment') {
-				previousStep = 'choose_plan';
-			} else {
-				closePopup();
-				return;
-			}
+			closePopup();
+			return;
 		}
 
 		if (currentStep === 'payment') {

@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
 if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 	final class ZCF_Zen_Checkout_Flow {
 
-		const VERSION = '0.1.64';
+		const VERSION = '0.1.67';
 		const NONCE_ACTION = 'zcf_checkout_flow';
 		private static $native_card_bootstrap_summary = null;
 
@@ -376,10 +376,11 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			}
 
 			$context             = self::get_checkout_context();
+			$mode                = isset( $context['mode'] ) ? $context['mode'] : 'money_purchase';
 			$step                = self::resolve_frame_step( $context, $step );
 			$show_checkout_intro = 'payment' === $step;
 			$is_cart_step        = in_array( $step, array( 'choose_plan', 'shortage_prompt' ), true );
-			$show_back           = 'payment' === $step && ! empty( $context['has_booking_items'] );
+			$show_back           = 'payment' === $step && ! empty( $context['has_booking_items'] ) && ( 'mixed_recovery' === $mode || ! empty( $context['has_recovery_products'] ) );
 
 			ob_start();
 			?>
@@ -2821,6 +2822,20 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			}
 
 			WC()->cart->calculate_totals();
+
+			$context = self::get_checkout_context();
+			$mode    = isset( $context['mode'] ) ? (string) $context['mode'] : 'money_purchase';
+
+			if ( 'mixed_recovery' !== $mode ) {
+				WC()->cart->remove_cart_item( $cart_item_key );
+				WC()->cart->calculate_totals();
+
+				wp_send_json_error(
+					array(
+						'message' => __( 'This Zencoin plan does not cover the selected booking. Please choose a plan with enough Zencoins.', 'zen-checkout-flow' ),
+					)
+				);
+			}
 
 			if ( function_exists( 'wc_clear_notices' ) ) {
 				wc_clear_notices();
