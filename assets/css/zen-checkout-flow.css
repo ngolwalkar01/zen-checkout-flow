@@ -327,12 +327,12 @@ body.zcf-popup-open {
 }
 
 .zen-coin-global {
-	width: 62px;
-	height: 62px;
+	width: 47px;
+	height: 47px;
 	display: grid;
 	place-items: center;
 	position: relative;
-	border: 3px solid var(--zcf-gold);
+	border: 1px solid var(--zcf-gold);
 	border-radius: 50%;
 	background: var(--zcf-gold);
 	color: #3f3f42;
@@ -344,10 +344,10 @@ body.zcf-popup-open {
 
 .zen-coin-global__ring {
 	position: absolute;
-	inset: 8px;
-	border: 3px solid #3f3f42;
-	border-radius: 50%;
-	pointer-events: none;
+    inset: 3px;
+    border: 1px solid #3f3f42;
+    border-radius: 50%;
+    pointer-events: none;
 }
 
 .zen-coin-global__value {
@@ -357,21 +357,21 @@ body.zcf-popup-open {
 
 .zcf-product-zencoins .zen-coin-global,
 .zcf-recovery-card__zencoins .zen-coin-global {
-	width: 44px;
-	height: 44px;
-	border-width: 2px;
+	width: 47px;
+	height: 47px;
+	border-width: 1px;
 	font-size: 18px;
 }
 
 .zcf-product-zencoins .zen-coin-global__ring,
 .zcf-recovery-card__zencoins .zen-coin-global__ring {
-	inset: 6px;
-	border-width: 2px;
+	inset: 3px;
+	border-width: 1px;
 }
 
 .zcf-booking-card__head .zen-coin-global {
-	width: 62px;
-	height: 62px;
+	width: 47px;
+	height: 47px;
 	background: transparent;
 	color: var(--zcf-gold);
 	box-shadow: inset 0 0 0 4px rgba(226, 190, 82, 0.16);
