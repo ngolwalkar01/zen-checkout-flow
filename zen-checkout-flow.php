@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
 if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 	final class ZCF_Zen_Checkout_Flow {
 
-		const VERSION = '0.1.68';
+		const VERSION = '0.1.69';
 		const NONCE_ACTION = 'zcf_checkout_flow';
 		private static $native_card_bootstrap_summary = null;
 
@@ -225,11 +225,15 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 				return true;
 			}
 
+			if ( function_exists( 'is_checkout' ) && is_checkout() ) {
+				return true;
+			}
+
 			if ( self::get_mixed_recovery_result_from_request() ) {
 				return true;
 			}
 
-			return isset( $_GET['zcf_open_checkout'] ) && '1' === wc_clean( wp_unslash( $_GET['zcf_open_checkout'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			return false;
 		}
 
 		/**
