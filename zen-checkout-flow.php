@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Zen Checkout Flow
  * Description: Popup-based WooCommerce checkout/cart flow for logged-in customers.
- * Version: 0.1.56
+ * Version: 0.1.57
  * Author: Custom
  * Text Domain: zen-checkout-flow
  *
@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
 if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 	final class ZCF_Zen_Checkout_Flow {
 
-		const VERSION = '0.1.56';
+		const VERSION = '0.1.57';
 		const NONCE_ACTION = 'zcf_checkout_flow';
 		private static $native_card_bootstrap_summary = null;
 
@@ -2142,14 +2142,23 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 		 * @return bool
 		 */
 		private static function should_hide_gateway_in_popup( $gateway ) {
+			$gateway_id = is_object( $gateway ) && isset( $gateway->id ) ? (string) $gateway->id : (string) $gateway;
+			$gateway_id = strtolower( $gateway_id );
+
+			if ( 0 === strpos( $gateway_id, 'woocommerce_payments_' ) ) {
+				return true;
+			}
+
 			return 'wallet_internal' === self::get_gateway_strategy_for_gateway( $gateway );
 		}
 
 		/**
-		 * Remove wallet-style gateways from the available list.
+		 * Remove popup-incompatible gateways from the available list.
 		 *
 		 * For this project, wallet infrastructure is only used behind the Zencoin
-		 * system and should never be shown as a money checkout option.
+		 * system and should never be shown as a money checkout option. WooPayments
+		 * APM gateways are also hidden temporarily so the client demo uses the
+		 * known-working card checkout path.
 		 *
 		 * @param array $gateways Available gateways.
 		 * @return array
