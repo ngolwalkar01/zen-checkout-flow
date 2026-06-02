@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Zen Checkout Flow
  * Description: Popup-based WooCommerce checkout/cart flow for logged-in customers.
- * Version: 0.1.49
+ * Version: 0.1.50
  * Author: Custom
  * Text Domain: zen-checkout-flow
  *
@@ -318,11 +318,6 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 				<div class="zcf-popup-backdrop" data-zcf-popup-close></div>
 				<div class="zcf-popup-stage" data-zcf-popup-stage>
 					<div class="zcf-popup-loading" data-zcf-popup-loading><?php esc_html_e( 'Loading checkout...', 'zen-checkout-flow' ); ?></div>
-				</div>
-			</div>
-			<div class="zcf-native-host-stash" data-zcf-native-host-stash aria-hidden="true">
-				<div class="zcf-native-host-stash__item" data-zcf-persistent-checkout-host>
-					<?php echo self::render_checkout_block_host_markup(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 				</div>
 			</div>
 			<?php
@@ -1454,7 +1449,9 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 				<?php endif; ?>
 
 				<div class="zcf-payment-label"><?php esc_html_e( 'Payment method:', 'zen-checkout-flow' ); ?></div>
-				<?php echo self::render_native_payment_runtime_shell(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+				<a class="zcf-pay-button" href="<?php echo esc_url( wc_get_checkout_url() ); ?>" data-zcf-native-checkout>
+					<?php esc_html_e( 'Continue to payment', 'zen-checkout-flow' ); ?>
+				</a>
 			<?php elseif ( 'zencoin_booking' === $mode ) : ?>
 				<?php echo self::render_mode_notice( sprintf( __( 'This booking is covered by your wallet. Required: %1$s ZC. Available: %2$s ZC.', 'zen-checkout-flow' ), wc_format_decimal( isset( $context['required_zencoins'] ) ? $context['required_zencoins'] : 0, 2 ), wc_format_decimal( isset( $context['available_zencoins'] ) ? $context['available_zencoins'] : 0, 2 ) ), 'success' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 				<div class="zcf-payment-label"><?php esc_html_e( 'Payment method:', 'zen-checkout-flow' ); ?></div>

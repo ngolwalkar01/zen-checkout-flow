@@ -1188,6 +1188,9 @@ body.zcf-popup-open {
 }
 
 .zcf-pay-button {
+	display: flex;
+	align-items: center;
+	justify-content: center;
 	width: 100%;
 	min-height: 50px;
 	border: 2px solid rgba(60, 60, 62, 0.85);
@@ -1195,6 +1198,7 @@ body.zcf-popup-open {
 	background: #aeb0b2;
 	color: #434447;
 	font-size: 16px;
+	text-decoration: none;
 }
 
 .zcf-pay-button.is-disabled,
