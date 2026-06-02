@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Zen Checkout Flow
  * Description: Popup-based WooCommerce checkout/cart flow for logged-in customers.
- * Version: 0.1.62
+ * Version: 0.1.70
  * Author: Custom
  * Text Domain: zen-checkout-flow
  *
@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
 if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 	final class ZCF_Zen_Checkout_Flow {
 
-		const VERSION = '0.1.69';
+		const VERSION = '0.1.70';
 		const NONCE_ACTION = 'zcf_checkout_flow';
 		private static $native_card_bootstrap_summary = null;
 
@@ -80,10 +80,13 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 		 */
 		public static function register_assets() {
 			$base_url = plugin_dir_url( __FILE__ );
+			$needs_checkout_runtime = self::should_enqueue_checkout_runtime_assets();
+			$native_card_bootstrap  = array();
 
-			self::hydrate_checkout_customer_profile();
-
-			$native_card_bootstrap = self::prepare_native_card_runtime_assets();
+			if ( $needs_checkout_runtime ) {
+				self::hydrate_checkout_customer_profile();
+				$native_card_bootstrap = self::prepare_native_card_runtime_assets();
+			}
 
 			wp_register_style(
 				'zcf-checkout-flow',
@@ -113,9 +116,10 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 					'popupOwnsRoute' => self::is_popup_owned_route(),
 					'myAccountUrl' => self::dependencies_loaded() ? wc_get_page_permalink( 'myaccount' ) : '',
 					'isLoggedIn'   => is_user_logged_in(),
-					'customer'    => self::get_checkout_customer_data(),
-					'gatewayRuntime' => self::get_gateway_runtime_context(),
+					'customer'    => $needs_checkout_runtime ? self::get_checkout_customer_data() : array(),
+					'gatewayRuntime' => $needs_checkout_runtime ? self::get_gateway_runtime_context() : array(),
 					'nativeCardBootstrap' => $native_card_bootstrap,
+					'checkoutRuntimeReady' => $needs_checkout_runtime,
 					'i18n'        => array(
 						'loading' => __( 'Updating...', 'zen-checkout-flow' ),
 						'error'   => __( 'Something went wrong. Please try again.', 'zen-checkout-flow' ),
@@ -125,20 +129,31 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			);
 
 			if ( ! is_admin() && self::dependencies_loaded() ) {
-				if ( wp_script_is( 'wc-checkout-block-frontend', 'registered' ) ) {
-					wp_enqueue_script( 'wc-checkout-block-frontend' );
-				}
-
-				if ( wp_style_is( 'wc-blocks-style', 'registered' ) ) {
-					wp_enqueue_style( 'wc-blocks-style' );
-				}
-
-				if ( wp_style_is( 'wc-blocks-packages-style', 'registered' ) ) {
-					wp_enqueue_style( 'wc-blocks-packages-style' );
+				if ( $needs_checkout_runtime ) {
+					self::enqueue_checkout_runtime_assets();
 				}
 
 				wp_enqueue_style( 'zcf-checkout-flow' );
 				wp_enqueue_script( 'zcf-checkout-flow' );
+			}
+		}
+
+		/**
+		 * Enqueue Woo checkout runtime assets only when the popup needs payment.
+		 *
+		 * @return void
+		 */
+		private static function enqueue_checkout_runtime_assets() {
+			if ( wp_script_is( 'wc-checkout-block-frontend', 'registered' ) ) {
+				wp_enqueue_script( 'wc-checkout-block-frontend' );
+			}
+
+			if ( wp_style_is( 'wc-blocks-style', 'registered' ) ) {
+				wp_enqueue_style( 'wc-blocks-style' );
+			}
+
+			if ( wp_style_is( 'wc-blocks-packages-style', 'registered' ) ) {
+				wp_enqueue_style( 'wc-blocks-packages-style' );
 			}
 		}
 
@@ -155,6 +170,9 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 
 			wp_enqueue_style( 'zcf-checkout-flow' );
 			wp_enqueue_script( 'zcf-checkout-flow' );
+			self::hydrate_checkout_customer_profile();
+			self::prepare_native_card_runtime_assets();
+			self::enqueue_checkout_runtime_assets();
 
 			$atts = shortcode_atts(
 				array(
@@ -209,6 +227,36 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			return ( function_exists( 'is_cart' ) && is_cart() )
 				|| $has_open_flag
 				|| self::get_mixed_recovery_result_from_request();
+		}
+
+		/**
+		 * Whether the current request needs the heavy Woo checkout runtime.
+		 *
+		 * @return bool
+		 */
+		private static function should_enqueue_checkout_runtime_assets() {
+			if ( is_admin() || ! self::dependencies_loaded() || self::is_native_checkout_page() ) {
+				return false;
+			}
+
+			return self::should_auto_open_popup()
+				|| self::is_popup_owned_route()
+				|| self::current_page_has_checkout_shortcode();
+		}
+
+		/**
+		 * Whether the current singular page embeds the checkout shortcode.
+		 *
+		 * @return bool
+		 */
+		private static function current_page_has_checkout_shortcode() {
+			if ( ! is_singular() ) {
+				return false;
+			}
+
+			$post = get_post();
+
+			return $post instanceof WP_Post && has_shortcode( (string) $post->post_content, 'zen_checkout_flow' );
 		}
 
 		/**
@@ -321,11 +369,13 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 					<div class="zcf-popup-loading" data-zcf-popup-loading><?php esc_html_e( 'Loading checkout...', 'zen-checkout-flow' ); ?></div>
 				</div>
 			</div>
-			<div class="zcf-native-host-stash" data-zcf-native-host-stash aria-hidden="true">
-				<div class="zcf-native-host-stash__item" data-zcf-persistent-checkout-host>
-					<?php echo self::render_checkout_block_host_markup(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+			<?php if ( self::should_enqueue_checkout_runtime_assets() ) : ?>
+				<div class="zcf-native-host-stash" data-zcf-native-host-stash aria-hidden="true">
+					<div class="zcf-native-host-stash__item" data-zcf-persistent-checkout-host>
+						<?php echo self::render_checkout_block_host_markup(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+					</div>
 				</div>
-			</div>
+			<?php endif; ?>
 			<?php
 		}
 

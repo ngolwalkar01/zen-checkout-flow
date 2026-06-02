@@ -638,6 +638,24 @@
 		return getPopup().find('[data-zcf-popup-stage]');
 	}
 
+	function ensureCheckoutRuntimeOrRedirect() {
+		var url;
+
+		if (zcfCheckout.checkoutRuntimeReady || getPersistentCheckoutHost().length) {
+			return true;
+		}
+
+		try {
+			url = new URL(window.location.href);
+			url.searchParams.set('zcf_open_checkout', '1');
+			window.location.href = url.toString();
+		} catch (error) {
+			window.location.href = zcfCheckout.cartUrl || window.location.href;
+		}
+
+		return false;
+	}
+
 	function renderPopupShell($stage, skipResult, step) {
 		return $.ajax({
 			type: 'POST',
@@ -673,6 +691,10 @@
 		}
 
 		if (openLoginFlowOrFallback()) {
+			return;
+		}
+
+		if (!ensureCheckoutRuntimeOrRedirect()) {
 			return;
 		}
 
