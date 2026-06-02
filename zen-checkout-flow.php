@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Zen Checkout Flow
  * Description: Popup-based WooCommerce checkout/cart flow for logged-in customers.
- * Version: 0.1.57
+ * Version: 0.1.58
  * Author: Custom
  * Text Domain: zen-checkout-flow
  *
@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
 if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 	final class ZCF_Zen_Checkout_Flow {
 
-		const VERSION = '0.1.57';
+		const VERSION = '0.1.58';
 		const NONCE_ACTION = 'zcf_checkout_flow';
 		private static $native_card_bootstrap_summary = null;
 
@@ -259,9 +259,6 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			if ( is_admin() || wp_doing_ajax() || ! self::dependencies_loaded() ) {
 				return;
 			}
-
-			// Temporary: keep the native Woo checkout accessible while comparing payment payloads.
-			return;
 
 			if ( ! self::is_native_checkout_page() ) {
 				return;
@@ -1916,84 +1913,84 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 		 */
 		private static function get_checkout_block_stub_markup() {
 			return '<!-- wp:woocommerce/checkout -->
-<div data-block-name="woocommerce/checkout" class="wp-block-woocommerce-checkout alignwide wc-block-checkout is-loading"><!-- wp:woocommerce/checkout-fields-block -->
-<div data-block-name="woocommerce/checkout-fields-block" class="wp-block-woocommerce-checkout-fields-block"><!-- wp:woocommerce/checkout-express-payment-block -->
-<div data-block-name="woocommerce/checkout-express-payment-block" class="wp-block-woocommerce-checkout-express-payment-block"></div>
+<div class="wp-block-woocommerce-checkout alignwide wc-block-checkout is-loading"><!-- wp:woocommerce/checkout-fields-block -->
+<div class="wp-block-woocommerce-checkout-fields-block"><!-- wp:woocommerce/checkout-express-payment-block -->
+<div class="wp-block-woocommerce-checkout-express-payment-block"></div>
 <!-- /wp:woocommerce/checkout-express-payment-block -->
 
 <!-- wp:woocommerce/checkout-contact-information-block -->
-<div data-block-name="woocommerce/checkout-contact-information-block" class="wp-block-woocommerce-checkout-contact-information-block"></div>
+<div class="wp-block-woocommerce-checkout-contact-information-block"></div>
 <!-- /wp:woocommerce/checkout-contact-information-block -->
 
 <!-- wp:woocommerce/checkout-shipping-method-block -->
-<div data-block-name="woocommerce/checkout-shipping-method-block" class="wp-block-woocommerce-checkout-shipping-method-block"></div>
+<div class="wp-block-woocommerce-checkout-shipping-method-block"></div>
 <!-- /wp:woocommerce/checkout-shipping-method-block -->
 
 <!-- wp:woocommerce/checkout-pickup-options-block -->
-<div data-block-name="woocommerce/checkout-pickup-options-block" class="wp-block-woocommerce-checkout-pickup-options-block"></div>
+<div class="wp-block-woocommerce-checkout-pickup-options-block"></div>
 <!-- /wp:woocommerce/checkout-pickup-options-block -->
 
 <!-- wp:woocommerce/checkout-shipping-address-block -->
-<div data-block-name="woocommerce/checkout-shipping-address-block" class="wp-block-woocommerce-checkout-shipping-address-block"></div>
+<div class="wp-block-woocommerce-checkout-shipping-address-block"></div>
 <!-- /wp:woocommerce/checkout-shipping-address-block -->
 
 <!-- wp:woocommerce/checkout-billing-address-block -->
-<div data-block-name="woocommerce/checkout-billing-address-block" class="wp-block-woocommerce-checkout-billing-address-block"></div>
+<div class="wp-block-woocommerce-checkout-billing-address-block"></div>
 <!-- /wp:woocommerce/checkout-billing-address-block -->
 
 <!-- wp:woocommerce/checkout-shipping-methods-block -->
-<div data-block-name="woocommerce/checkout-shipping-methods-block" class="wp-block-woocommerce-checkout-shipping-methods-block"></div>
+<div class="wp-block-woocommerce-checkout-shipping-methods-block"></div>
 <!-- /wp:woocommerce/checkout-shipping-methods-block -->
 
 <!-- wp:woocommerce/checkout-payment-block -->
-<div data-block-name="woocommerce/checkout-payment-block" class="wp-block-woocommerce-checkout-payment-block"></div>
+<div class="wp-block-woocommerce-checkout-payment-block"></div>
 <!-- /wp:woocommerce/checkout-payment-block -->
 
 <!-- wp:woocommerce/checkout-additional-information-block -->
-<div data-block-name="woocommerce/checkout-additional-information-block" class="wp-block-woocommerce-checkout-additional-information-block"></div>
+<div class="wp-block-woocommerce-checkout-additional-information-block"></div>
 <!-- /wp:woocommerce/checkout-additional-information-block -->
 
 <!-- wp:woocommerce/checkout-order-note-block -->
-<div data-block-name="woocommerce/checkout-order-note-block" class="wp-block-woocommerce-checkout-order-note-block"></div>
+<div class="wp-block-woocommerce-checkout-order-note-block"></div>
 <!-- /wp:woocommerce/checkout-order-note-block -->
 
 <!-- wp:woocommerce/checkout-terms-block -->
-<div data-block-name="woocommerce/checkout-terms-block" class="wp-block-woocommerce-checkout-terms-block"></div>
+<div class="wp-block-woocommerce-checkout-terms-block"></div>
 <!-- /wp:woocommerce/checkout-terms-block -->
 
 <!-- wp:woocommerce/checkout-actions-block -->
-<div data-block-name="woocommerce/checkout-actions-block" class="wp-block-woocommerce-checkout-actions-block"></div>
+<div class="wp-block-woocommerce-checkout-actions-block"></div>
 <!-- /wp:woocommerce/checkout-actions-block --></div>
 <!-- /wp:woocommerce/checkout-fields-block -->
 
 <!-- wp:woocommerce/checkout-totals-block -->
-<div data-block-name="woocommerce/checkout-totals-block" class="wp-block-woocommerce-checkout-totals-block"><!-- wp:woocommerce/checkout-order-summary-block -->
-<div data-block-name="woocommerce/checkout-order-summary-block" class="wp-block-woocommerce-checkout-order-summary-block"><!-- wp:woocommerce/checkout-order-summary-cart-items-block -->
-<div data-block-name="woocommerce/checkout-order-summary-cart-items-block" class="wp-block-woocommerce-checkout-order-summary-cart-items-block"></div>
+<div class="wp-block-woocommerce-checkout-totals-block"><!-- wp:woocommerce/checkout-order-summary-block -->
+<div class="wp-block-woocommerce-checkout-order-summary-block"><!-- wp:woocommerce/checkout-order-summary-cart-items-block -->
+<div class="wp-block-woocommerce-checkout-order-summary-cart-items-block"></div>
 <!-- /wp:woocommerce/checkout-order-summary-cart-items-block -->
 
+<!-- wp:woocommerce/checkout-order-summary-coupon-form-block -->
+<div class="wp-block-woocommerce-checkout-order-summary-coupon-form-block"></div>
+<!-- /wp:woocommerce/checkout-order-summary-coupon-form-block -->
+
 <!-- wp:woocommerce/checkout-order-summary-subtotal-block -->
-<div data-block-name="woocommerce/checkout-order-summary-subtotal-block" class="wp-block-woocommerce-checkout-order-summary-subtotal-block"></div>
+<div class="wp-block-woocommerce-checkout-order-summary-subtotal-block"></div>
 <!-- /wp:woocommerce/checkout-order-summary-subtotal-block -->
 
 <!-- wp:woocommerce/checkout-order-summary-fee-block -->
-<div data-block-name="woocommerce/checkout-order-summary-fee-block" class="wp-block-woocommerce-checkout-order-summary-fee-block"></div>
+<div class="wp-block-woocommerce-checkout-order-summary-fee-block"></div>
 <!-- /wp:woocommerce/checkout-order-summary-fee-block -->
 
 <!-- wp:woocommerce/checkout-order-summary-discount-block -->
-<div data-block-name="woocommerce/checkout-order-summary-discount-block" class="wp-block-woocommerce-checkout-order-summary-discount-block"></div>
+<div class="wp-block-woocommerce-checkout-order-summary-discount-block"></div>
 <!-- /wp:woocommerce/checkout-order-summary-discount-block -->
 
-<!-- wp:woocommerce/checkout-order-summary-coupon-form-block -->
-<div data-block-name="woocommerce/checkout-order-summary-coupon-form-block" class="wp-block-woocommerce-checkout-order-summary-coupon-form-block"></div>
-<!-- /wp:woocommerce/checkout-order-summary-coupon-form-block -->
-
 <!-- wp:woocommerce/checkout-order-summary-shipping-block -->
-<div data-block-name="woocommerce/checkout-order-summary-shipping-block" class="wp-block-woocommerce-checkout-order-summary-shipping-block"></div>
+<div class="wp-block-woocommerce-checkout-order-summary-shipping-block"></div>
 <!-- /wp:woocommerce/checkout-order-summary-shipping-block -->
 
 <!-- wp:woocommerce/checkout-order-summary-taxes-block -->
-<div data-block-name="woocommerce/checkout-order-summary-taxes-block" class="wp-block-woocommerce-checkout-order-summary-taxes-block"></div>
+<div class="wp-block-woocommerce-checkout-order-summary-taxes-block"></div>
 <!-- /wp:woocommerce/checkout-order-summary-taxes-block --></div>
 <!-- /wp:woocommerce/checkout-order-summary-block --></div>
 <!-- /wp:woocommerce/checkout-totals-block --></div>
@@ -2142,23 +2139,14 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 		 * @return bool
 		 */
 		private static function should_hide_gateway_in_popup( $gateway ) {
-			$gateway_id = is_object( $gateway ) && isset( $gateway->id ) ? (string) $gateway->id : (string) $gateway;
-			$gateway_id = strtolower( $gateway_id );
-
-			if ( 0 === strpos( $gateway_id, 'woocommerce_payments_' ) ) {
-				return true;
-			}
-
 			return 'wallet_internal' === self::get_gateway_strategy_for_gateway( $gateway );
 		}
 
 		/**
-		 * Remove popup-incompatible gateways from the available list.
+		 * Remove wallet-style gateways from the available list.
 		 *
 		 * For this project, wallet infrastructure is only used behind the Zencoin
-		 * system and should never be shown as a money checkout option. WooPayments
-		 * APM gateways are also hidden temporarily so the client demo uses the
-		 * known-working card checkout path.
+		 * system and should never be shown as a money checkout option.
 		 *
 		 * @param array $gateways Available gateways.
 		 * @return array
@@ -2530,7 +2518,16 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 						$registry->add( 'woocommerce_payments_data', $data );
 					}
 
-					$summary['data_keys'] = array( 'woocommerce_payments_data' );
+					if ( ! $registry->exists( 'paymentMethodData' ) ) {
+						$registry->add(
+							'paymentMethodData',
+							array(
+								'woocommerce_payments' => $data,
+							)
+						);
+					}
+
+					$summary['data_keys'] = array( 'woocommerce_payments_data', 'paymentMethodData' );
 				}
 			}
 

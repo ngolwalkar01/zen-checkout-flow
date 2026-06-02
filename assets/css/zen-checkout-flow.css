@@ -377,9 +377,9 @@ body.zcf-popup-open {
 	box-shadow: inset 0 0 0 4px rgba(226, 190, 82, 0.16);
 }
 
-/*.zcf-booking-card__head .zen-coin-global__ring {
+.zcf-booking-card__head .zen-coin-global__ring {
 	border-color: var(--zcf-gold);
-}*/
+}
 
 .zcf-booking-card__meta {
 	display: grid;
@@ -645,13 +645,12 @@ body.zcf-popup-open {
 	width: min(92vw, clamp(1180px, 78vw, 1680px));
 	max-width: none;
 	pointer-events: none;
-	opacity: 1;
-	visibility: visible;
+	opacity: 0;
+	visibility: hidden;
 	z-index: -1;
 }
 
 .zcf-block-checkout-host {
-	position: relative;
 	border: 1px solid rgba(232, 232, 226, 0.2);
 	border-radius: 12px;
 	background: rgba(255, 255, 255, 0.04);
@@ -698,16 +697,7 @@ body.zcf-popup-open {
 .zcf-block-checkout-host .wp-block-woocommerce-checkout-totals-block,
 .zcf-block-checkout-host .wc-block-components-sidebar,
 .zcf-block-checkout-host .wp-block-woocommerce-checkout-order-summary-block {
-	position: absolute !important;
-	left: -100vw !important;
-	top: auto !important;
-	width: 1px !important;
-	height: 1px !important;
-	margin: 0 !important;
-	padding: 0 !important;
-	overflow: hidden !important;
-	opacity: 0 !important;
-	pointer-events: none !important;
+	display: none !important;
 }
 
 .zcf-block-checkout-host .wc-block-components-sidebar-layout {
