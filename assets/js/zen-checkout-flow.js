@@ -72,6 +72,232 @@
 		clearStaleCoinBalanceNotices($shell);
 	}
 
+	function isDebugEnabled() {
+		try {
+			return new URL(window.location.href).searchParams.get('zcf_debug') === '1';
+		} catch (error) {
+			return false;
+		}
+	}
+
+	function getSettingKeys(name) {
+		var settings;
+
+		try {
+			settings = window.wc && window.wc.wcSettings && typeof window.wc.wcSettings.getSetting === 'function'
+				? window.wc.wcSettings.getSetting(name, {})
+				: {};
+		} catch (error) {
+			settings = {};
+		}
+
+		return settings && typeof settings === 'object' ? Object.keys(settings) : [];
+	}
+
+	function getRegistryPaymentMethodNames() {
+		try {
+			if (window.wc && window.wc.wcBlocksRegistry && typeof window.wc.wcBlocksRegistry.getPaymentMethods === 'function') {
+				return Object.keys(window.wc.wcBlocksRegistry.getPaymentMethods() || {});
+			}
+		} catch (error) {
+			// Debug only.
+		}
+
+		return [];
+	}
+
+	function getStoreSelector(storeName) {
+		if (!window.wp || !window.wp.data || typeof window.wp.data.select !== 'function') {
+			return null;
+		}
+
+		try {
+			return window.wp.data.select(storeName);
+		} catch (error) {
+			return null;
+		}
+	}
+
+	function getPaymentDebugSnapshot() {
+		var paymentStore = getStoreSelector('wc/store/payment');
+		var checkoutStore = getStoreSelector('wc/store/checkout');
+		var cartStore = getStoreSelector('wc/store/cart');
+		var paymentMethodData = {};
+		var activePaymentMethod = '';
+		var checkedPaymentInput = $('.zcf-block-checkout-host input[name="radio-control-wc-payment-method-options"]:checked, .zcf-block-checkout-host input[name="payment-method"]:checked').first();
+
+		try {
+			paymentMethodData = paymentStore && typeof paymentStore.getPaymentMethodData === 'function'
+				? (paymentStore.getPaymentMethodData() || {})
+				: {};
+		} catch (error) {
+			paymentMethodData = {};
+		}
+
+		try {
+			activePaymentMethod = paymentStore && typeof paymentStore.getActivePaymentMethod === 'function'
+				? paymentStore.getActivePaymentMethod()
+				: '';
+		} catch (error) {
+			activePaymentMethod = '';
+		}
+
+		return {
+			activePaymentMethod: activePaymentMethod,
+			checkedPaymentInput: checkedPaymentInput.length ? checkedPaymentInput.attr('id') || checkedPaymentInput.val() || '' : '',
+			availablePaymentMethods: paymentStore && typeof paymentStore.getAvailablePaymentMethods === 'function'
+				? Object.keys(paymentStore.getAvailablePaymentMethods() || {})
+				: [],
+			paymentMethodDataKeys: Object.keys(paymentMethodData || {}),
+			paymentMethodData: paymentMethodData,
+			paymentMethodsInitialized: paymentStore && typeof paymentStore.paymentMethodsInitialized === 'function'
+				? paymentStore.paymentMethodsInitialized()
+				: null,
+			expressPaymentMethodsInitialized: paymentStore && typeof paymentStore.expressPaymentMethodsInitialized === 'function'
+				? paymentStore.expressPaymentMethodsInitialized()
+				: null,
+			isPaymentReady: paymentStore && typeof paymentStore.isPaymentReady === 'function'
+				? paymentStore.isPaymentReady()
+				: null,
+			isPaymentProcessing: paymentStore && typeof paymentStore.isPaymentProcessing === 'function'
+				? paymentStore.isPaymentProcessing()
+				: null,
+			checkoutStatus: checkoutStore && typeof checkoutStore.getStatus === 'function'
+				? checkoutStore.getStatus()
+				: '',
+			isCheckoutProcessing: checkoutStore && typeof checkoutStore.isProcessing === 'function'
+				? checkoutStore.isProcessing()
+				: null,
+			isCheckoutBeforeProcessing: checkoutStore && typeof checkoutStore.isBeforeProcessing === 'function'
+				? checkoutStore.isBeforeProcessing()
+				: null,
+			isCheckoutAfterProcessing: checkoutStore && typeof checkoutStore.isAfterProcessing === 'function'
+				? checkoutStore.isAfterProcessing()
+				: null,
+			cartPaymentMethods: cartStore && typeof cartStore.getCartData === 'function' && cartStore.getCartData()
+				? Object.keys((cartStore.getCartData().paymentMethods || {}))
+				: [],
+			registryMethods: getRegistryPaymentMethodNames(),
+			settingsPaymentMethodDataKeys: getSettingKeys('paymentMethodData'),
+			wcpaySettingsKeys: getSettingKeys('woocommerce_payments_data'),
+			checkoutBlocks: $('[data-block-name="woocommerce/checkout"], .wp-block-woocommerce-checkout').length,
+			paymentBlocks: $('[data-block-name="woocommerce/checkout-payment-block"], .wp-block-woocommerce-checkout-payment-block').length,
+			placeOrderButtons: $('.wc-block-components-checkout-place-order-button').length,
+			paymentElementWrappers: $('.wcpay-payment-element-wrapper, .wcpay-payment-element').length
+		};
+	}
+
+	function getCheckoutDebugBody(body) {
+		var parsed;
+
+		if (typeof body !== 'string') {
+			return body ? '[non-string body]' : '';
+		}
+
+		try {
+			parsed = JSON.parse(body);
+
+			return {
+				payment_method: parsed.payment_method || '',
+				payment_data: parsed.payment_data || [],
+				billing_address: parsed.billing_address || {},
+				extensions_keys: parsed.extensions ? Object.keys(parsed.extensions) : []
+			};
+		} catch (error) {
+			return '[unparsed body]';
+		}
+	}
+
+	function logPaymentDebug(label, extra) {
+		if (!isDebugEnabled() || !window.console || typeof window.console.log !== 'function') {
+			return;
+		}
+
+		window.console.log('[ZCF payment debug] ' + label, $.extend({
+			step: currentStep,
+			snapshot: getPaymentDebugSnapshot()
+		}, extra || {}));
+	}
+
+	function installPaymentDebugProbe() {
+		var originalFetch;
+		var unsubscribe;
+		var lastStoreFingerprint = '';
+
+		if (!isDebugEnabled() || window.__zcfPaymentDebugInstalled) {
+			return;
+		}
+
+		window.__zcfPaymentDebugInstalled = true;
+		logPaymentDebug('probe-installed');
+
+		if (typeof window.fetch === 'function') {
+			originalFetch = window.fetch;
+
+			window.fetch = function () {
+				var args = arguments;
+				var request = args[0];
+				var options = args[1] || {};
+				var url = '';
+				var shouldLog = false;
+
+				try {
+					url = typeof request === 'string' ? request : (request && request.url ? request.url : '');
+					shouldLog = /\/wc\/store\/v1\/checkout/.test(url) || /\/v1\/payment_methods/.test(url);
+				} catch (error) {
+					url = '';
+				}
+
+				if (shouldLog) {
+					logPaymentDebug('fetch:start', {
+						url: url,
+						body: /\/wc\/store\/v1\/checkout/.test(url) ? getCheckoutDebugBody(options.body) : '[stripe payment method request]'
+					});
+				}
+
+				return originalFetch.apply(this, args).then(function (response) {
+					if (shouldLog) {
+						logPaymentDebug('fetch:done', {
+							url: url,
+							status: response.status
+						});
+					}
+
+					return response;
+				});
+			};
+		}
+
+		if (window.wp && window.wp.data && typeof window.wp.data.subscribe === 'function') {
+			unsubscribe = window.wp.data.subscribe(function () {
+				var snapshot = getPaymentDebugSnapshot();
+				var fingerprint = JSON.stringify({
+					activePaymentMethod: snapshot.activePaymentMethod,
+					paymentMethodDataKeys: snapshot.paymentMethodDataKeys,
+					isPaymentReady: snapshot.isPaymentReady,
+					isPaymentProcessing: snapshot.isPaymentProcessing,
+					checkoutStatus: snapshot.checkoutStatus,
+					isCheckoutProcessing: snapshot.isCheckoutProcessing
+				});
+
+				if (fingerprint !== lastStoreFingerprint) {
+					lastStoreFingerprint = fingerprint;
+					logPaymentDebug('store:change');
+				}
+			});
+
+			window.__zcfPaymentDebugUnsubscribe = unsubscribe;
+		}
+
+		$(document).on('pointerdown.zcfPaymentDebug mousedown.zcfPaymentDebug click.zcfPaymentDebug', '.zcf-block-checkout-host .wc-block-components-checkout-place-order-button', function (event) {
+			logPaymentDebug('place-order:' + event.type);
+
+			window.setTimeout(function () {
+				logPaymentDebug('place-order:' + event.type + ':after-250ms');
+			}, 250);
+		});
+	}
+
 	function clearStaleCoinBalanceNotices($scope) {
 		var patterns = [
 			/current balance is/i,
@@ -559,6 +785,7 @@
 	});
 
 	$(function () {
+		installPaymentDebugProbe();
 		restoreStepState();
 
 		if (zcfCheckout.autoOpen) {
