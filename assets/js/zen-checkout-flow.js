@@ -70,6 +70,25 @@
 
 		$slot.empty().append($host);
 		clearStaleCoinBalanceNotices($shell);
+		notifyNativePaymentHostAttached($host);
+	}
+
+	function notifyNativePaymentHostAttached($host) {
+		if (!$host || !$host.length) {
+			return;
+		}
+
+		window.setTimeout(function () {
+			try {
+				window.dispatchEvent(new Event('resize'));
+			} catch (error) {
+				var resizeEvent = document.createEvent('UIEvents');
+				resizeEvent.initUIEvent('resize', true, false, window, 0);
+				window.dispatchEvent(resizeEvent);
+			}
+
+			$host.trigger('zcf:native-payment-host-attached');
+		}, 50);
 	}
 
 	function clearStaleCoinBalanceNotices($scope) {
