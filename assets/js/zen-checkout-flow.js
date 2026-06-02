@@ -115,6 +115,157 @@
 		}, 50);
 	}
 
+	function isDebugEnabled() {
+		try {
+			return new URL(window.location.href).searchParams.get('zcf_debug') === '1';
+		} catch (error) {
+			return false;
+		}
+	}
+
+	function getPaymentStoreSnapshot() {
+		var select;
+		var settings = {};
+		var registryMethods = [];
+		var snapshot = {
+			activePaymentMethod: '',
+			availablePaymentMethods: [],
+			paymentMethodDataKeys: [],
+			paymentMethodData: {},
+			paymentMethodsInitialized: null,
+			expressPaymentMethodsInitialized: null,
+			isPaymentReady: null,
+			isPaymentProcessing: null,
+			registryMethods: [],
+			settingsPaymentMethodDataKeys: [],
+			checkoutBlocks: $('.wp-block-woocommerce-checkout').length,
+			paymentBlocks: $('.wp-block-woocommerce-checkout-payment-block').length,
+			placeOrderButtons: $('.wc-block-components-checkout-place-order-button').length
+		};
+
+		if (!window.wp || !window.wp.data || typeof window.wp.data.select !== 'function') {
+			return snapshot;
+		}
+
+		try {
+			select = window.wp.data.select('wc/store/payment');
+		} catch (error) {
+			return snapshot;
+		}
+
+		try {
+			settings = window.wc && window.wc.wcSettings && typeof window.wc.wcSettings.getSetting === 'function'
+				? (window.wc.wcSettings.getSetting('paymentMethodData', {}) || {})
+				: {};
+		} catch (error) {
+			settings = {};
+		}
+
+		try {
+			registryMethods = window.wc && window.wc.wcBlocksRegistry && typeof window.wc.wcBlocksRegistry.getPaymentMethods === 'function'
+				? Object.keys(window.wc.wcBlocksRegistry.getPaymentMethods() || {})
+				: [];
+		} catch (error) {
+			registryMethods = [];
+		}
+
+		try {
+			snapshot.activePaymentMethod = typeof select.getActivePaymentMethod === 'function' ? select.getActivePaymentMethod() : '';
+			snapshot.availablePaymentMethods = typeof select.getAvailablePaymentMethods === 'function' ? Object.keys(select.getAvailablePaymentMethods() || {}) : [];
+			snapshot.paymentMethodData = typeof select.getPaymentMethodData === 'function' ? (select.getPaymentMethodData() || {}) : {};
+			snapshot.paymentMethodDataKeys = Object.keys(snapshot.paymentMethodData || {});
+			snapshot.paymentMethodsInitialized = typeof select.paymentMethodsInitialized === 'function' ? select.paymentMethodsInitialized() : null;
+			snapshot.expressPaymentMethodsInitialized = typeof select.expressPaymentMethodsInitialized === 'function' ? select.expressPaymentMethodsInitialized() : null;
+			snapshot.isPaymentReady = typeof select.isPaymentReady === 'function' ? select.isPaymentReady() : null;
+			snapshot.isPaymentProcessing = typeof select.isPaymentProcessing === 'function' ? select.isPaymentProcessing() : null;
+			snapshot.registryMethods = registryMethods;
+			snapshot.settingsPaymentMethodDataKeys = Object.keys(settings);
+		} catch (error) {
+			snapshot.error = error && error.message ? error.message : String(error);
+		}
+
+		return snapshot;
+	}
+
+	function logPaymentDebug(label) {
+		if (!isDebugEnabled() || !window.console || typeof window.console.log !== 'function') {
+			return;
+		}
+
+		window.console.log('[ZCF payment debug] ' + label, getPaymentStoreSnapshot());
+	}
+
+	function installPaymentRequestDebugProbe() {
+		if (!isDebugEnabled() || window.__zcfPaymentRequestDebugInstalled || typeof window.fetch !== 'function') {
+			return;
+		}
+
+		window.__zcfPaymentRequestDebugInstalled = true;
+
+		var originalFetch = window.fetch;
+
+		function getDebugBody(body) {
+			var parsed;
+
+			if (typeof body !== 'string') {
+				return '';
+			}
+
+			try {
+				parsed = JSON.parse(body);
+
+				return {
+					payment_method: parsed.payment_method || '',
+					payment_data: parsed.payment_data || []
+				};
+			} catch (error) {
+				return '';
+			}
+		}
+
+		window.fetch = function () {
+			var args = arguments;
+			var request = args[0];
+			var options = args[1] || {};
+			var url = '';
+			var body = options && options.body;
+
+			try {
+				url = typeof request === 'string' ? request : (request && request.url ? request.url : '');
+			} catch (error) {
+				url = '';
+			}
+
+			if (/\/wc\/store\/v1\/checkout/.test(url) || /\/v1\/payment_methods/.test(url)) {
+				try {
+					window.console.log('[ZCF payment debug] fetch:start', {
+						url: url,
+						body: getDebugBody(body),
+						paymentStore: getPaymentStoreSnapshot()
+					});
+				} catch (error) {
+					// Debug logging only.
+				}
+			}
+
+			return originalFetch.apply(this, args).then(function (response) {
+				if (/\/wc\/store\/v1\/checkout/.test(url) || /\/v1\/payment_methods/.test(url)) {
+					try {
+						window.console.log('[ZCF payment debug] fetch:done', {
+							url: url,
+							status: response.status,
+							paymentStore: getPaymentStoreSnapshot()
+						});
+					} catch (error) {
+						// Debug logging only.
+					}
+				}
+
+				return response;
+			});
+		};
+	}
+
 	function clearStaleCoinBalanceNotices($scope) {
 		var patterns = [
 			/current balance is/i,
@@ -536,6 +687,14 @@
 		goBackStep();
 	});
 
+	$(document).on('pointerdown mousedown click', '.zcf-block-checkout-host .wc-block-components-checkout-place-order-button', function (event) {
+		logPaymentDebug('place-order:' + event.type);
+
+		window.setTimeout(function () {
+			logPaymentDebug('place-order:' + event.type + ':after-250ms');
+		}, 250);
+	});
+
 	$(document).on('click', '[data-zcf-plan-tab]', function () {
 		filterPlanCards($(this));
 	});
@@ -602,6 +761,7 @@
 	});
 
 	$(function () {
+		installPaymentRequestDebugProbe();
 		restoreStepState();
 
 		if (zcfCheckout.autoOpen) {
