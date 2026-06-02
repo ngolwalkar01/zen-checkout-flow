@@ -9,12 +9,23 @@
 		$shell.toggleClass('is-loading', !!isLoading);
 	}
 
+	function syncBackButtonState($scope) {
+		var $back = $scope.find('[data-zcf-back]').first();
+
+		if (!$back.length || stepHistory.length > 0) {
+			return;
+		}
+
+		$back.replaceWith('<span class="zcf-topbar-spacer" aria-hidden="true"></span>');
+	}
+
 	function updateFragments($shell, data) {
 		parkPersistentCheckoutHost();
 
 		if (Object.prototype.hasOwnProperty.call(data, 'html')) {
 			$shell.replaceWith(data.html);
 			currentStep = data.step || getShellStep(getPopupStage()) || currentStep;
+			syncBackButtonState(getPopupStage());
 			attachPersistentCheckoutHost(getPopupStage());
 			clearStaleCoinBalanceNotices(getPopupStage());
 			return;
@@ -37,6 +48,7 @@
 			$shell.find('.zcf-modal').attr('data-zcf-step', data.step);
 		}
 
+		syncBackButtonState($shell);
 		attachPersistentCheckoutHost($shell);
 		clearStaleCoinBalanceNotices($shell);
 	}
@@ -640,6 +652,7 @@
 			if (response && response.success && response.data && response.data.html) {
 				$stage.html(response.data.html);
 				currentStep = getShellStep($stage) || response.data.step || step || 'auto';
+				syncBackButtonState($stage);
 				attachPersistentCheckoutHost($stage);
 				return;
 			}
@@ -676,6 +689,7 @@
 		}
 
 		currentStep = getShellStep($stage) || currentStep;
+		syncBackButtonState($stage);
 		attachPersistentCheckoutHost($stage);
 
 	}

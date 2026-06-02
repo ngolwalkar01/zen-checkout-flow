@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
 if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 	final class ZCF_Zen_Checkout_Flow {
 
-		const VERSION = '0.1.67';
+		const VERSION = '0.1.68';
 		const NONCE_ACTION = 'zcf_checkout_flow';
 		private static $native_card_bootstrap_summary = null;
 
@@ -1119,6 +1119,10 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 						<div class="zcf-booking-card__instructor"><?php echo esc_html( $summary['instructor'] ); ?></div>
 					<?php endif; ?>
 				</div>
+
+				<button type="button" class="zcf-product-cta zcf-product-cta--remove" data-zcf-remove-cart-item="<?php echo esc_attr( $cart_item_key ); ?>">
+					<?php esc_html_e( 'Remove', 'zen-checkout-flow' ); ?>
+				</button>
 			</article>
 			<?php
 
@@ -3014,11 +3018,12 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 		 * Send refreshed fragments.
 		 */
 		private static function send_fragments() {
+			$step = self::resolve_frame_step( self::get_checkout_context(), self::get_ajax_step() );
+
 			wp_send_json_success(
 				array(
-					'cartItems'     => self::render_cart_items(),
-					'paymentPanel'  => self::render_payment_panel(),
-					'payButtonHtml' => self::render_primary_action(),
+					'html' => self::render_shell( '', $step ),
+					'step' => $step,
 				)
 			);
 		}
