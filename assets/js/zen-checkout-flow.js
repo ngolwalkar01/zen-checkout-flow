@@ -79,8 +79,6 @@
 		}
 
 		window.setTimeout(function () {
-			syncBlocksActivePaymentMethod($host);
-
 			try {
 				window.dispatchEvent(new Event('resize'));
 			} catch (error) {
@@ -91,146 +89,6 @@
 
 			$host.trigger('zcf:native-payment-host-attached');
 		}, 50);
-	}
-
-	function getBlocksPaymentStore() {
-		if (!window.wp || !window.wp.data || typeof window.wp.data.select !== 'function' || typeof window.wp.data.dispatch !== 'function') {
-			return null;
-		}
-
-		try {
-			return {
-				select: window.wp.data.select('wc/store/payment'),
-				dispatch: window.wp.data.dispatch('wc/store/payment')
-			};
-		} catch (error) {
-			return null;
-		}
-	}
-
-	function getAvailableBlocksPaymentMethods(store) {
-		var methods = {};
-
-		if (!store || !store.select || typeof store.select.getAvailablePaymentMethods !== 'function') {
-			return methods;
-		}
-
-		try {
-			methods = store.select.getAvailablePaymentMethods() || {};
-		} catch (error) {
-			methods = {};
-		}
-
-		return methods;
-	}
-
-	function getCheckedBlocksPaymentMethod($host, methods) {
-		var methodKeys = Object.keys(methods || {});
-		var $checked = $host
-			.find(
-				'.wp-block-woocommerce-checkout-payment-block input[type="radio"]:checked, ' +
-				'.wp-block-woocommerce-checkout-payment-block [role="radio"][aria-checked="true"]'
-			)
-			.first();
-		var value;
-		var id;
-		var match;
-
-		if (!$checked.length) {
-			return methodKeys.length ? methodKeys[0] : '';
-		}
-
-		value = String($checked.val() || $checked.attr('data-value') || $checked.attr('data-payment-method') || '');
-		if (value && methods[value]) {
-			return value;
-		}
-
-		id = String($checked.attr('id') || $checked.attr('aria-labelledby') || '');
-		if (id) {
-			match = methodKeys.find(function (methodKey) {
-				return id.indexOf(methodKey) !== -1;
-			});
-
-			if (match) {
-				return match;
-			}
-		}
-
-		return methodKeys.length ? methodKeys[0] : '';
-	}
-
-	function dispatchBlocksCheckoutEvent(eventName, detail) {
-		var hooks = window.wp && window.wp.hooks;
-		var cartData = {};
-
-		if (!hooks || typeof hooks.doAction !== 'function') {
-			return;
-		}
-
-		try {
-			if (window.wp.data && typeof window.wp.data.select === 'function') {
-				cartData = window.wp.data.select('wc/store/cart').getCartData() || {};
-			}
-		} catch (error) {
-			cartData = {};
-		}
-
-		try {
-			hooks.doAction(
-				'experimental__woocommerce_blocks-checkout-' + eventName,
-				Object.assign({}, detail || {}, {
-					storeCart: cartData
-				})
-			);
-		} catch (error) {
-			// Woo Blocks owns payment setup; the popup only mirrors the native selection event.
-		}
-	}
-
-	function syncBlocksActivePaymentMethod($host, attempts) {
-		var store = getBlocksPaymentStore();
-		var methods = getAvailableBlocksPaymentMethods(store);
-		var methodName;
-		var activeMethod = '';
-
-		attempts = attempts || 0;
-
-		if (!store || !store.dispatch || typeof store.dispatch.__internalSetActivePaymentMethod !== 'function') {
-			return;
-		}
-
-		if (!Object.keys(methods).length) {
-			if (attempts < 20) {
-				window.setTimeout(function () {
-					syncBlocksActivePaymentMethod($host, attempts + 1);
-				}, 150);
-			}
-			return;
-		}
-
-		try {
-			activeMethod = store.select && typeof store.select.getActivePaymentMethod === 'function' ? store.select.getActivePaymentMethod() : '';
-		} catch (error) {
-			activeMethod = '';
-		}
-
-		methodName = getCheckedBlocksPaymentMethod($host, methods);
-
-		if (!methodName) {
-			return;
-		}
-
-		try {
-			if (activeMethod !== methodName) {
-				store.dispatch.__internalSetActivePaymentMethod(methodName);
-			}
-
-			dispatchBlocksCheckoutEvent('set-active-payment-method', {
-				paymentMethodSlug: methodName
-			});
-		} catch (error) {
-			// The native Blocks payment UI remains responsible for validation and token generation.
-		}
 	}
 
 	function clearStaleCoinBalanceNotices($scope) {
@@ -652,24 +510,6 @@
 
 	$(document).on('click', '[data-zcf-back]', function () {
 		goBackStep();
-	});
-
-	$(document).on('click change', '.zcf-block-checkout-host .wp-block-woocommerce-checkout-payment-block input[type="radio"], .zcf-block-checkout-host .wp-block-woocommerce-checkout-payment-block [role="radio"]', function () {
-		var $host = $(this).closest('[data-zcf-persistent-checkout-host]');
-
-		if ($host.length) {
-			window.setTimeout(function () {
-				syncBlocksActivePaymentMethod($host);
-			}, 0);
-		}
-	});
-
-	$(document).on('pointerdown mousedown click', '.zcf-block-checkout-host .wc-block-components-checkout-place-order-button', function () {
-		var $host = $(this).closest('[data-zcf-persistent-checkout-host]');
-
-		if ($host.length) {
-			syncBlocksActivePaymentMethod($host);
-		}
 	});
 
 	$(document).on('click', '[data-zcf-plan-tab]', function () {
