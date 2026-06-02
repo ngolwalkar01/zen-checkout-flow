@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Zen Checkout Flow
  * Description: Popup-based WooCommerce checkout/cart flow for logged-in customers.
- * Version: 0.1.58
+ * Version: 0.1.59
  * Author: Custom
  * Text Domain: zen-checkout-flow
  *
@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
 if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 	final class ZCF_Zen_Checkout_Flow {
 
-		const VERSION = '0.1.58';
+		const VERSION = '0.1.59';
 		const NONCE_ACTION = 'zcf_checkout_flow';
 		private static $native_card_bootstrap_summary = null;
 
@@ -2139,14 +2139,18 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 		 * @return bool
 		 */
 		private static function should_hide_gateway_in_popup( $gateway ) {
-			return 'wallet_internal' === self::get_gateway_strategy_for_gateway( $gateway );
+			$gateway_id = is_object( $gateway ) && isset( $gateway->id ) ? (string) $gateway->id : (string) $gateway;
+			$gateway_id = strtolower( $gateway_id );
+
+			return 'woocommerce_payments' !== $gateway_id;
 		}
 
 		/**
-		 * Remove wallet-style gateways from the available list.
+		 * Keep the popup checkout on the known-working WooPayments card gateway.
 		 *
-		 * For this project, wallet infrastructure is only used behind the Zencoin
-		 * system and should never be shown as a money checkout option.
+		 * WooPayments APM gateways use their own setup flow. Until that flow is
+		 * implemented in the popup, expose only the base card gateway and reset any
+		 * previously selected APM such as Klarna from the Woo session.
 		 *
 		 * @param array $gateways Available gateways.
 		 * @return array
@@ -2156,10 +2160,21 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 				return $gateways;
 			}
 
+			$has_card_gateway = false;
+
 			foreach ( $gateways as $gateway_id => $gateway ) {
 				if ( self::should_hide_gateway_in_popup( $gateway ) ) {
 					unset( $gateways[ $gateway_id ] );
+					continue;
 				}
+
+				if ( 'woocommerce_payments' === (string) $gateway_id ) {
+					$has_card_gateway = true;
+				}
+			}
+
+			if ( $has_card_gateway && WC()->session ) {
+				WC()->session->set( 'chosen_payment_method', 'woocommerce_payments' );
 			}
 
 			return $gateways;
