@@ -260,6 +260,9 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 				return;
 			}
 
+			// Temporary: keep the native Woo checkout accessible while comparing payment payloads.
+			return;
+
 			if ( ! self::is_native_checkout_page() ) {
 				return;
 			}
