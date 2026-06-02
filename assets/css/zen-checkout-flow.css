@@ -353,6 +353,7 @@ body.zcf-popup-open {
 .zen-coin-global__value {
 	position: relative;
 	z-index: 1;
+	color: #3f3d3d !Important;
 }
 
 .zcf-product-zencoins .zen-coin-global,
@@ -372,7 +373,6 @@ body.zcf-popup-open {
 .zcf-booking-card__head .zen-coin-global {
 	width: 47px;
 	height: 47px;
-	background: transparent;
 	color: var(--zcf-gold);
 	box-shadow: inset 0 0 0 4px rgba(226, 190, 82, 0.16);
 }
