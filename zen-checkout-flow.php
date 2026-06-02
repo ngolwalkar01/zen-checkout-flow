@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
 if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 	final class ZCF_Zen_Checkout_Flow {
 
-		const VERSION = '0.1.62';
+		const VERSION = '0.1.63';
 		const NONCE_ACTION = 'zcf_checkout_flow';
 		private static $native_card_bootstrap_summary = null;
 
@@ -1140,6 +1140,40 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			}
 
 			return is_callable( array( $cart_item['data'], 'is_type' ) ) && $cart_item['data']->is_type( array( 'booking', 'bookable' ) );
+		}
+
+		/**
+		 * Determine whether the cart contains a paid non-booking item.
+		 *
+		 * @return bool
+		 */
+		private static function cart_has_paid_purchase_items() {
+			if ( ! self::dependencies_loaded() || ! WC()->cart ) {
+				return false;
+			}
+
+			foreach ( WC()->cart->get_cart() as $cart_item ) {
+				if ( self::is_booking_cart_item( $cart_item ) ) {
+					continue;
+				}
+
+				$quantity = isset( $cart_item['quantity'] ) ? (int) $cart_item['quantity'] : 0;
+
+				if ( $quantity <= 0 ) {
+					continue;
+				}
+
+				$line_total    = isset( $cart_item['line_total'] ) ? (float) $cart_item['line_total'] : 0.0;
+				$line_subtotal = isset( $cart_item['line_subtotal'] ) ? (float) $cart_item['line_subtotal'] : 0.0;
+				$product       = isset( $cart_item['data'] ) ? $cart_item['data'] : null;
+				$product_price = ( $product && is_callable( array( $product, 'get_price' ) ) ) ? (float) $product->get_price() : 0.0;
+
+				if ( $line_total > 0 || $line_subtotal > 0 || $product_price > 0 ) {
+					return true;
+				}
+			}
+
+			return false;
 		}
 
 		/**
@@ -2349,10 +2383,10 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			if ( function_exists( 'cbb_get_checkout_context' ) ) {
 				$context = cbb_get_checkout_context( get_current_user_id() );
 
-				return is_array( $context ) ? $context : array();
+				return is_array( $context ) ? self::normalize_checkout_context_for_cart( $context ) : array();
 			}
 
-			return array(
+			return self::normalize_checkout_context_for_cart( array(
 				'mode'                  => 'money_purchase',
 				'has_booking_items'     => false,
 				'has_credit_products'   => false,
@@ -2365,7 +2399,24 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 				'projected_missing_zencoins' => 0,
 				'wallet_is_frozen'      => false,
 				'blocking_reason'       => '',
-			);
+			) );
+		}
+
+		/**
+		 * Keep the local checkout mode aligned with the full WooCommerce cart.
+		 *
+		 * @param array $context Checkout context.
+		 * @return array
+		 */
+		private static function normalize_checkout_context_for_cart( $context ) {
+			$mode = isset( $context['mode'] ) ? (string) $context['mode'] : 'money_purchase';
+
+			if ( 'zencoin_booking' === $mode && self::cart_has_paid_purchase_items() ) {
+				$context['mode'] = 'money_purchase';
+				$context['has_credit_products'] = true;
+			}
+
+			return $context;
 		}
 
 		/**
