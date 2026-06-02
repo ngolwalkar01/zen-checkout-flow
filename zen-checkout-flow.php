@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Zen Checkout Flow
  * Description: Popup-based WooCommerce checkout/cart flow for logged-in customers.
- * Version: 0.1.47
+ * Version: 0.1.48
  * Author: Custom
  * Text Domain: zen-checkout-flow
  *

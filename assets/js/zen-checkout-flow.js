@@ -159,6 +159,34 @@
 		return methodKeys.length ? methodKeys[0] : '';
 	}
 
+	function dispatchBlocksCheckoutEvent(eventName, detail) {
+		var hooks = window.wp && window.wp.hooks;
+		var cartData = {};
+
+		if (!hooks || typeof hooks.doAction !== 'function') {
+			return;
+		}
+
+		try {
+			if (window.wp.data && typeof window.wp.data.select === 'function') {
+				cartData = window.wp.data.select('wc/store/cart').getCartData() || {};
+			}
+		} catch (error) {
+			cartData = {};
+		}
+
+		try {
+			hooks.doAction(
+				'experimental__woocommerce_blocks-checkout-' + eventName,
+				Object.assign({}, detail || {}, {
+					storeCart: cartData
+				})
+			);
+		} catch (error) {
+			// Woo Blocks owns payment setup; the popup only mirrors the native selection event.
+		}
+	}
+
 	function syncBlocksActivePaymentMethod($host, attempts) {
 		var store = getBlocksPaymentStore();
 		var methods = getAvailableBlocksPaymentMethods(store);
@@ -188,12 +216,18 @@
 
 		methodName = getCheckedBlocksPaymentMethod($host, methods);
 
-		if (!methodName || activeMethod === methodName) {
+		if (!methodName) {
 			return;
 		}
 
 		try {
-			store.dispatch.__internalSetActivePaymentMethod(methodName);
+			if (activeMethod !== methodName) {
+				store.dispatch.__internalSetActivePaymentMethod(methodName);
+			}
+
+			dispatchBlocksCheckoutEvent('set-active-payment-method', {
+				paymentMethodSlug: methodName
+			});
 		} catch (error) {
 			// The native Blocks payment UI remains responsible for validation and token generation.
 		}

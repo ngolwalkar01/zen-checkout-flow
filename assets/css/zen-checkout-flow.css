@@ -645,8 +645,8 @@ body.zcf-popup-open {
 	width: min(92vw, clamp(1180px, 78vw, 1680px));
 	max-width: none;
 	pointer-events: none;
-	opacity: 0;
-	visibility: hidden;
+	opacity: 1;
+	visibility: visible;
 	z-index: -1;
 }
 
