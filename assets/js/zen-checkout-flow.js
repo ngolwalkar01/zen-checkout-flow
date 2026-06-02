@@ -557,10 +557,6 @@
 	});
 
 	$(document).on('click', 'a[href]', function (event) {
-		if ($(this).is('[data-zcf-native-checkout]')) {
-			return;
-		}
-
 		if (!isCartOrCheckoutUrl(this.href)) {
 			return;
 		}
