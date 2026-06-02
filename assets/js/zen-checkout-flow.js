@@ -78,29 +78,6 @@
 			return;
 		}
 
-		function dispatchBlocksRenderEvent() {
-			var checkoutBlock = $host.find('.wp-block-woocommerce-checkout').get(0);
-			var event;
-
-			if (!checkoutBlock || $host.data('zcfBlocksRenderEventDispatched')) {
-				return;
-			}
-
-			$host.data('zcfBlocksRenderEventDispatched', true);
-
-			try {
-				event = new CustomEvent('wc-blocks_render_blocks_frontend', {
-					bubbles: true,
-					cancelable: false
-				});
-			} catch (error) {
-				event = document.createEvent('Event');
-				event.initEvent('wc-blocks_render_blocks_frontend', true, false);
-			}
-
-			checkoutBlock.dispatchEvent(event);
-		}
-
 		window.setTimeout(function () {
 			try {
 				window.dispatchEvent(new Event('resize'));
@@ -110,7 +87,6 @@
 				window.dispatchEvent(resizeEvent);
 			}
 
-			dispatchBlocksRenderEvent();
 			$host.trigger('zcf:native-payment-host-attached');
 		}, 50);
 	}
@@ -264,6 +240,24 @@
 				return response;
 			});
 		};
+
+		logPaymentDebug('debug-probe-installed');
+
+		document.addEventListener('pointerdown', function (event) {
+			if (event.target && event.target.closest && event.target.closest('.zcf-block-checkout-host .wc-block-components-checkout-place-order-button')) {
+				logPaymentDebug('place-order:capture:pointerdown');
+			}
+		}, true);
+
+		document.addEventListener('click', function (event) {
+			if (event.target && event.target.closest && event.target.closest('.zcf-block-checkout-host .wc-block-components-checkout-place-order-button')) {
+				logPaymentDebug('place-order:capture:click');
+
+				window.setTimeout(function () {
+					logPaymentDebug('place-order:capture:click:after-250ms');
+				}, 250);
+			}
+		}, true);
 	}
 
 	function clearStaleCoinBalanceNotices($scope) {
