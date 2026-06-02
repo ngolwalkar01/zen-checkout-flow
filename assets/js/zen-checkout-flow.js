@@ -118,10 +118,28 @@
 		}
 	}
 
+	function getCartPaymentMethods() {
+		var cartStore = getStoreSelector('wc/store/cart');
+		var cartData;
+		var paymentMethods;
+
+		try {
+			cartData = cartStore && typeof cartStore.getCartData === 'function' ? cartStore.getCartData() : null;
+			paymentMethods = cartData ? cartData.paymentMethods : null;
+		} catch (error) {
+			paymentMethods = null;
+		}
+
+		if (Array.isArray(paymentMethods)) {
+			return paymentMethods;
+		}
+
+		return paymentMethods && typeof paymentMethods === 'object' ? Object.keys(paymentMethods) : [];
+	}
+
 	function getPaymentDebugSnapshot() {
 		var paymentStore = getStoreSelector('wc/store/payment');
 		var checkoutStore = getStoreSelector('wc/store/checkout');
-		var cartStore = getStoreSelector('wc/store/cart');
 		var paymentMethodData = {};
 		var activePaymentMethod = '';
 		var checkedPaymentInput = $('.zcf-block-checkout-host input[name="radio-control-wc-payment-method-options"]:checked, .zcf-block-checkout-host input[name="payment-method"]:checked').first();
@@ -174,9 +192,7 @@
 			isCheckoutAfterProcessing: checkoutStore && typeof checkoutStore.isAfterProcessing === 'function'
 				? checkoutStore.isAfterProcessing()
 				: null,
-			cartPaymentMethods: cartStore && typeof cartStore.getCartData === 'function' && cartStore.getCartData()
-				? Object.keys((cartStore.getCartData().paymentMethods || {}))
-				: [],
+			cartPaymentMethods: getCartPaymentMethods(),
 			registryMethods: getRegistryPaymentMethodNames(),
 			settingsPaymentMethodDataKeys: getSettingKeys('paymentMethodData'),
 			wcpaySettingsKeys: getSettingKeys('woocommerce_payments_data'),
@@ -208,6 +224,130 @@
 		}
 	}
 
+	function parseCheckoutPayload(body) {
+		if (typeof body !== 'string') {
+			return null;
+		}
+
+		try {
+			return JSON.parse(body);
+		} catch (error) {
+			return null;
+		}
+	}
+
+	function getCurrentPaymentMethodData() {
+		var paymentStore = getStoreSelector('wc/store/payment');
+
+		try {
+			return paymentStore && typeof paymentStore.getPaymentMethodData === 'function'
+				? (paymentStore.getPaymentMethodData() || {})
+				: {};
+		} catch (error) {
+			return {};
+		}
+	}
+
+	function getPaymentDataValue(paymentData, key) {
+		var index;
+
+		if (!Array.isArray(paymentData)) {
+			return '';
+		}
+
+		for (index = 0; index < paymentData.length; index += 1) {
+			if (paymentData[index] && paymentData[index].key === key) {
+				return paymentData[index].value;
+			}
+		}
+
+		return '';
+	}
+
+	function setPaymentDataValue(paymentData, key, value) {
+		var index;
+
+		for (index = 0; index < paymentData.length; index += 1) {
+			if (paymentData[index] && paymentData[index].key === key) {
+				paymentData[index].value = value;
+				return;
+			}
+		}
+
+		paymentData.push({
+			key: key,
+			value: value
+		});
+	}
+
+	function checkoutPayloadNeedsWcpayData(payload) {
+		return payload
+			&& payload.payment_method === 'woocommerce_payments'
+			&& !getPaymentDataValue(payload.payment_data || [], 'wcpay-payment-method');
+	}
+
+	function mergeWcpayPaymentData(payload, paymentMethodData) {
+		var keys = [
+			'payment_method',
+			'wcpay-payment-method',
+			'wcpay-fraud-prevention-token',
+			'wcpay-fingerprint'
+		];
+
+		payload.payment_data = Array.isArray(payload.payment_data) ? payload.payment_data : [];
+
+		keys.forEach(function (key) {
+			if (Object.prototype.hasOwnProperty.call(paymentMethodData, key)) {
+				setPaymentDataValue(payload.payment_data, key, paymentMethodData[key]);
+			}
+		});
+
+		return payload;
+	}
+
+	function waitForWcpayPaymentData(timeout) {
+		var startedAt = Date.now();
+
+		return new Promise(function (resolve) {
+			var unsubscribe = null;
+			var timer = null;
+
+			function cleanup() {
+				if (timer) {
+					window.clearTimeout(timer);
+					timer = null;
+				}
+
+				if (typeof unsubscribe === 'function') {
+					unsubscribe();
+					unsubscribe = null;
+				}
+			}
+
+			function check() {
+				var paymentMethodData = getCurrentPaymentMethodData();
+
+				if (paymentMethodData['wcpay-payment-method']) {
+					cleanup();
+					resolve(paymentMethodData);
+					return;
+				}
+
+				if (Date.now() - startedAt >= timeout) {
+					cleanup();
+					resolve(paymentMethodData);
+				}
+			}
+
+			if (window.wp && window.wp.data && typeof window.wp.data.subscribe === 'function') {
+				unsubscribe = window.wp.data.subscribe(check);
+			}
+
+			timer = window.setTimeout(check, timeout);
+			check();
+		});
+	}
+
 	function logPaymentDebug(label, extra) {
 		if (!isDebugEnabled() || !window.console || typeof window.console.log !== 'function') {
 			return;
@@ -223,15 +363,10 @@
 		var originalFetch;
 		var unsubscribe;
 		var lastStoreFingerprint = '';
+		var debugEnabled = isDebugEnabled();
 
-		if (!isDebugEnabled() || window.__zcfPaymentDebugInstalled) {
-			return;
-		}
-
-		window.__zcfPaymentDebugInstalled = true;
-		logPaymentDebug('probe-installed');
-
-		if (typeof window.fetch === 'function') {
+		if (!window.__zcfPaymentFetchGuardInstalled && typeof window.fetch === 'function') {
+			window.__zcfPaymentFetchGuardInstalled = true;
 			originalFetch = window.fetch;
 
 			window.fetch = function () {
@@ -240,18 +375,54 @@
 				var options = args[1] || {};
 				var url = '';
 				var shouldLog = false;
+				var isCheckout = false;
+				var payload = null;
+				var guardedOptions;
 
 				try {
 					url = typeof request === 'string' ? request : (request && request.url ? request.url : '');
-					shouldLog = /\/wc\/store\/v1\/checkout/.test(url) || /\/v1\/payment_methods/.test(url);
+					isCheckout = /\/wc\/store\/v1\/checkout/.test(url);
+					shouldLog = isCheckout || /\/v1\/payment_methods/.test(url);
 				} catch (error) {
 					url = '';
 				}
 
+				payload = isCheckout ? parseCheckoutPayload(options.body) : null;
+
 				if (shouldLog) {
 					logPaymentDebug('fetch:start', {
 						url: url,
-						body: /\/wc\/store\/v1\/checkout/.test(url) ? getCheckoutDebugBody(options.body) : '[stripe payment method request]'
+						body: isCheckout ? getCheckoutDebugBody(options.body) : '[stripe payment method request]'
+					});
+				}
+
+				if (checkoutPayloadNeedsWcpayData(payload)) {
+					logPaymentDebug('checkout:waiting-for-wcpay-data');
+
+					return waitForWcpayPaymentData(3000).then(function (paymentMethodData) {
+						if (paymentMethodData['wcpay-payment-method']) {
+							guardedOptions = $.extend({}, options, {
+								body: JSON.stringify(mergeWcpayPaymentData(payload, paymentMethodData))
+							});
+							args = [request, guardedOptions];
+
+							logPaymentDebug('checkout:wcpay-data-attached', {
+								body: getCheckoutDebugBody(guardedOptions.body)
+							});
+						} else {
+							logPaymentDebug('checkout:wcpay-data-timeout');
+						}
+
+						return originalFetch.apply(this, args);
+					}.bind(this)).then(function (response) {
+						if (shouldLog) {
+							logPaymentDebug('fetch:done', {
+								url: url,
+								status: response.status
+							});
+						}
+
+						return response;
 					});
 				}
 
@@ -267,6 +438,13 @@
 				});
 			};
 		}
+
+		if (!debugEnabled || window.__zcfPaymentDebugInstalled) {
+			return;
+		}
+
+		window.__zcfPaymentDebugInstalled = true;
+		logPaymentDebug('probe-installed');
 
 		if (window.wp && window.wp.data && typeof window.wp.data.subscribe === 'function') {
 			unsubscribe = window.wp.data.subscribe(function () {
