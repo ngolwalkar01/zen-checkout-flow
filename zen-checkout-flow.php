@@ -226,7 +226,8 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 
 			return ( function_exists( 'is_cart' ) && is_cart() )
 				|| $has_open_flag
-				|| self::get_mixed_recovery_result_from_request();
+				|| self::get_mixed_recovery_result_from_request()
+				|| self::get_successful_purchase_result_from_request();
 		}
 
 		/**
@@ -277,7 +278,7 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 				return true;
 			}
 
-			if ( self::get_mixed_recovery_result_from_request() ) {
+			if ( self::get_mixed_recovery_result_from_request() || self::get_successful_purchase_result_from_request() ) {
 				return true;
 			}
 
@@ -423,6 +424,15 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 
 			if ( $recovery_result ) {
 				return self::render_mixed_recovery_result( $recovery_result );
+			}
+
+			$purchase_result = self::get_successful_purchase_result_from_request( $current_url );
+
+			if ( $purchase_result ) {
+				return self::render_mixed_recovery_success_result(
+					$purchase_result,
+					self::get_mixed_recovery_result_config( 'completed', $purchase_result )
+				);
 			}
 
 			if ( ! WC()->cart || WC()->cart->is_empty() ) {
@@ -2382,6 +2392,47 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 				'user_message'  => ! empty( $context['user_message'] ) ? wp_strip_all_tags( (string) $context['user_message'] ) : '',
 				'action'        => ! empty( $context['action'] ) ? sanitize_key( $context['action'] ) : '',
 				'updated_at_gmt' => ! empty( $context['updated_at_gmt'] ) ? sanitize_text_field( $context['updated_at_gmt'] ) : '',
+			);
+		}
+
+		/**
+		 * Read a successful standard WooCommerce purchase from the order-received URL.
+		 *
+		 * @param string $current_url Optional current frontend URL from AJAX.
+		 * @return array|false
+		 */
+		private static function get_successful_purchase_result_from_request( $current_url = '' ) {
+			if ( ! self::dependencies_loaded() || ! is_user_logged_in() ) {
+				return false;
+			}
+
+			$order = self::get_order_from_result_request( $current_url );
+
+			if ( ! $order ) {
+				return false;
+			}
+
+			$checkout_mode = (string) $order->get_meta( '_cbb_checkout_mode', true );
+
+			if ( in_array( $checkout_mode, array( 'mixed_recovery', 'zencoin_booking' ), true ) ) {
+				return false;
+			}
+
+			if ( (int) $order->get_customer_id() !== get_current_user_id() && ! current_user_can( 'manage_woocommerce' ) ) {
+				return false;
+			}
+
+			if ( ! $order->is_paid() && ! $order->has_status( array( 'processing', 'completed' ) ) ) {
+				return false;
+			}
+
+			return array(
+				'order_id'      => $order->get_id(),
+				'order_number'  => $order->get_order_number(),
+				'status'        => 'completed',
+				'user_message'  => '',
+				'action'        => '',
+				'updated_at_gmt' => '',
 			);
 		}
 
