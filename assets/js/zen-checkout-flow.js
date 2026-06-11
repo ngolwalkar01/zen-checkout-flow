@@ -22,6 +22,10 @@
 	function updateFragments($shell, data) {
 		parkPersistentCheckoutHost();
 
+		if (Object.prototype.hasOwnProperty.call(data, 'cartCount')) {
+			notifyCartCount(data.cartCount);
+		}
+
 		if (Object.prototype.hasOwnProperty.call(data, 'html')) {
 			$shell.replaceWith(data.html);
 			currentStep = data.step || getShellStep(getPopupStage()) || currentStep;
@@ -51,6 +55,16 @@
 		syncBackButtonState($shell);
 		attachPersistentCheckoutHost($shell);
 		clearStaleCoinBalanceNotices($shell);
+	}
+
+	function notifyCartCount(count) {
+		document.dispatchEvent(
+			new CustomEvent('zenctuary:cart-count-updated', {
+				detail: {
+					count: Number(count || 0)
+				}
+			})
+		);
 	}
 
 	function getPersistentCheckoutHost() {
@@ -720,6 +734,10 @@
 			}
 		}).done(function (response) {
 			if (response && response.success && response.data && response.data.html) {
+				if (Object.prototype.hasOwnProperty.call(response.data, 'cartCount')) {
+					notifyCartCount(response.data.cartCount);
+				}
+
 				$stage.html(response.data.html);
 				currentStep = getShellStep($stage) || response.data.step || step || 'auto';
 				syncBackButtonState($stage);

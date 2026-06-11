@@ -388,8 +388,9 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 
 			wp_send_json_success(
 				array(
-					'html' => self::render_shell( self::get_ajax_current_url(), self::get_ajax_step() ),
-					'step' => self::normalize_step( self::get_ajax_step() ),
+					'html'      => self::render_shell( self::get_ajax_current_url(), self::get_ajax_step() ),
+					'step'      => self::normalize_step( self::get_ajax_step() ),
+					'cartCount' => self::get_cart_count(),
 				)
 			);
 		}
@@ -3155,10 +3156,20 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 
 			wp_send_json_success(
 				array(
-					'html' => self::render_shell( '', $step ),
-					'step' => $step,
+					'html'      => self::render_shell( '', $step ),
+					'step'      => $step,
+					'cartCount' => self::get_cart_count(),
 				)
 			);
+		}
+
+		/**
+		 * Get current Woo cart quantity for header badges.
+		 *
+		 * @return int
+		 */
+		private static function get_cart_count() {
+			return self::dependencies_loaded() && WC()->cart ? (int) WC()->cart->get_cart_contents_count() : 0;
 		}
 	}
 
