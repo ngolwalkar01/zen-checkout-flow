@@ -594,6 +594,58 @@
 			});
 	}
 
+	function reloadPopupAfterCoupon($shell, step) {
+		var $stage = getPopupStage();
+		var nextStep = step || currentStep || getShellStep($shell) || 'auto';
+
+		if (!$stage.length) {
+			return;
+		}
+
+		currentStep = nextStep;
+		parkPersistentCheckoutHost();
+		$stage.html('<div class="zcf-popup-loading" data-zcf-popup-loading>' + zcfCheckout.i18n.loading + '</div>');
+		renderPopupShell($stage, true, nextStep);
+	}
+
+	function requestCouponChange($shell, action, payload) {
+		var step = currentStep || getShellStep($shell) || 'auto';
+
+		setLoading($shell, true);
+
+		return $.ajax({
+			type: 'POST',
+			url: zcfCheckout.ajaxUrl,
+			data: $.extend(
+				{
+					action: action,
+					nonce: zcfCheckout.nonce,
+					zcf_step: step
+				},
+				payload || {}
+			)
+		})
+			.done(function (response) {
+				if (response && response.success) {
+					reloadPopupAfterCoupon($shell, response.data && response.data.step ? response.data.step : step);
+					return;
+				}
+
+				if (response && response.data && response.data.loggedOut && openLoginFlowOrFallback()) {
+					closePopup();
+					return;
+				}
+
+				showMessage($shell, response && response.data ? response.data.message : zcfCheckout.i18n.error, 'error');
+			})
+			.fail(function () {
+				showMessage($shell, zcfCheckout.i18n.error, 'error');
+			})
+			.always(function () {
+				setLoading($shell, false);
+			});
+	}
+
 	function bookWithZencoins($shell) {
 		setLoading($shell, true);
 
@@ -838,18 +890,16 @@
 		var $shell = $form.closest('[data-zcf-checkout-flow]');
 		var couponCode = String($form.find('[name="coupon_code"]').val() || '').trim();
 
-		return request($shell, 'zcf_apply_coupon', {
-			coupon_code: couponCode,
-			zcf_step: currentStep || getShellStep($shell) || 'auto'
+		return requestCouponChange($shell, 'zcf_apply_coupon', {
+			coupon_code: couponCode
 		});
 	}
 
 	function removeCoupon($button) {
 		var $shell = $button.closest('[data-zcf-checkout-flow]');
 
-		return request($shell, 'zcf_remove_coupon', {
-			coupon_code: $button.data('zcf-remove-coupon') || '',
-			zcf_step: currentStep || getShellStep($shell) || 'auto'
+		return requestCouponChange($shell, 'zcf_remove_coupon', {
+			coupon_code: $button.data('zcf-remove-coupon') || ''
 		});
 	}
 
