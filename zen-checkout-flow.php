@@ -1553,6 +1553,8 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 					<?php echo self::render_mode_notice( __( 'Complete payment for the recovery product first. The booking will consume the granted Zencoins immediately after payment succeeds.', 'zen-checkout-flow' ), 'info' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 				<?php endif; ?>
 
+				<?php echo self::render_coupon_form(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+
 				<div class="zcf-payment-label"><?php esc_html_e( 'Payment method:', 'zen-checkout-flow' ); ?></div>
 				<?php echo self::render_native_payment_runtime_shell(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 			<?php elseif ( 'zencoin_booking' === $mode ) : ?>
@@ -1562,6 +1564,30 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			<?php else : ?>
 				<?php echo self::render_insufficient_zencoin_prompt( $context, $step ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 			<?php endif; ?>
+			<?php
+			return ob_get_clean();
+		}
+
+		/**
+		 * Render the Woo coupon form for paid checkout modes.
+		 *
+		 * @return string
+		 */
+		private static function render_coupon_form() {
+			if ( ! WC()->cart || ! wc_coupons_enabled() ) {
+				return '';
+			}
+
+			ob_start();
+			?>
+			<div class="zcf-coupon-area" data-zcf-coupon-area>
+				<form class="zcf-coupon" data-zcf-coupon-form>
+					<label class="screen-reader-text" for="zcf-coupon-code"><?php esc_html_e( 'Coupon code', 'zen-checkout-flow' ); ?></label>
+					<input id="zcf-coupon-code" type="text" name="coupon_code" autocomplete="off" placeholder="<?php echo esc_attr__( 'Coupon code', 'zen-checkout-flow' ); ?>" />
+					<button type="submit"><?php esc_html_e( 'Apply', 'zen-checkout-flow' ); ?></button>
+				</form>
+				<?php echo self::render_applied_coupons(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+			</div>
 			<?php
 			return ob_get_clean();
 		}
@@ -2742,6 +2768,8 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			if ( '' === $coupon_code ) {
 				wp_send_json_error( array( 'message' => __( 'Please enter a discount code.', 'zen-checkout-flow' ) ) );
 			}
+
+			wc_clear_notices();
 
 			$applied = WC()->cart->apply_coupon( $coupon_code );
 			WC()->cart->calculate_totals();

@@ -834,6 +834,25 @@
 		});
 	}
 
+	function applyCoupon($form) {
+		var $shell = $form.closest('[data-zcf-checkout-flow]');
+		var couponCode = String($form.find('[name="coupon_code"]').val() || '').trim();
+
+		return request($shell, 'zcf_apply_coupon', {
+			coupon_code: couponCode,
+			zcf_step: currentStep || getShellStep($shell) || 'auto'
+		});
+	}
+
+	function removeCoupon($button) {
+		var $shell = $button.closest('[data-zcf-checkout-flow]');
+
+		return request($shell, 'zcf_remove_coupon', {
+			coupon_code: $button.data('zcf-remove-coupon') || '',
+			zcf_step: currentStep || getShellStep($shell) || 'auto'
+		});
+	}
+
 	function goBackStep() {
 		var previousStep = stepHistory.pop();
 		var $stage = getPopupStage();
@@ -923,6 +942,15 @@
 
 	$(document).on('click', '[data-zcf-remove-cart-item]', function () {
 		removeCartItem($(this));
+	});
+
+	$(document).on('submit', '[data-zcf-coupon-form]', function (event) {
+		event.preventDefault();
+		applyCoupon($(this));
+	});
+
+	$(document).on('click', '[data-zcf-remove-coupon]', function () {
+		removeCoupon($(this));
 	});
 
 	$(document).on('click', '[data-zcf-back]', function () {
