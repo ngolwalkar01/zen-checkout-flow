@@ -497,7 +497,7 @@ body.zcf-popup-open {
 }
 
 .zcf-product-price span {
-	display: block;
+	display: inline-flex;
 	margin-top: 2px;
 	color: var(--zcf-text);
 	font-size: 14px;
