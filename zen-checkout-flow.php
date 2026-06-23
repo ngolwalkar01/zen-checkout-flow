@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Zen Checkout Flow
  * Description: Popup-based WooCommerce checkout/cart flow for logged-in customers.
- * Version: 0.1.70
+ * Version: 0.1.71
  * Author: Custom
  * Text Domain: zen-checkout-flow
  *
@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
 if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 	final class ZCF_Zen_Checkout_Flow {
 
-		const VERSION = '0.1.70';
+		const VERSION = '0.1.71';
 		const NONCE_ACTION = 'zcf_checkout_flow';
 		private static $native_card_bootstrap_summary = null;
 
@@ -1782,7 +1782,7 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			$query_args = array(
 				'status'     => 'publish',
 				'limit'      => 24,
-				'type'       => array( 'simple', 'subscription', 'variation', 'subscription_variation' ),
+				'type'       => array( 'simple', 'subscription', 'variable-subscription', 'variation', 'subscription_variation' ),
 				'orderby'    => 'menu_order',
 				'order'      => 'ASC',
 				'return'     => 'objects',
@@ -1790,7 +1790,7 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 					'relation' => 'OR',
 					array(
 						'key'     => '_cbb_zencoin_product_type',
-						'value'   => array( 'package', 'drop_in' ),
+						'value'   => array( 'package', 'drop_in', 'membership' ),
 						'compare' => 'IN',
 					),
 					array(
@@ -1810,16 +1810,26 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 
 			$products = wc_get_products( apply_filters( 'zcf_recovery_product_query_args', $query_args, $missing ) );
 			$offers   = array();
+			$seen     = array();
 
 			foreach ( $products as $product ) {
-				if ( ! $product instanceof WC_Product || ! $product->is_purchasable() ) {
-					continue;
-				}
+				foreach ( self::get_recovery_offer_products_for_render( $product ) as $offer_product ) {
+					if ( ! $offer_product instanceof WC_Product || ! $offer_product->is_purchasable() ) {
+						continue;
+					}
 
-				$offer = self::build_recovery_product_offer( $product );
+					$offer = self::build_recovery_product_offer( $offer_product );
 
-				if ( $offer ) {
-					$offers[] = $offer;
+					if ( $offer ) {
+						$offer_key = absint( $offer['product_id'] ) . ':' . absint( $offer['variation_id'] );
+
+						if ( isset( $seen[ $offer_key ] ) ) {
+							continue;
+						}
+
+						$seen[ $offer_key ] = true;
+						$offers[] = $offer;
+					}
 				}
 			}
 
@@ -1835,6 +1845,30 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			);
 
 			return (array) apply_filters( 'zcf_recovery_product_offers', $offers, $missing );
+		}
+
+		/**
+		 * Expand variable subscriptions so each variation can be rendered as an offer.
+		 *
+		 * @param WC_Product $product Product from the recovery query.
+		 * @return WC_Product[]
+		 */
+		private static function get_recovery_offer_products_for_render( $product ) {
+			if ( ! $product instanceof WC_Product || ! $product->is_type( 'variable-subscription' ) ) {
+				return array( $product );
+			}
+
+			$products = array();
+
+			foreach ( $product->get_children() as $child_id ) {
+				$variation = wc_get_product( $child_id );
+
+				if ( $variation instanceof WC_Product ) {
+					$products[] = $variation;
+				}
+			}
+
+			return ! empty( $products ) ? $products : array( $product );
 		}
 
 		/**
