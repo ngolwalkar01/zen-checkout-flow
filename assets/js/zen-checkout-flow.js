@@ -307,9 +307,13 @@
 	}
 
 	function checkoutPayloadNeedsWcpayData(payload) {
-		return payload
-			&& payload.payment_method === 'woocommerce_payments'
-			&& !getPaymentDataValue(payload.payment_data || [], 'wcpay-payment-method');
+		if (!payload || payload.payment_method !== 'woocommerce_payments') {
+			return false;
+		}
+
+		return !getPaymentDataValue(payload.payment_data || [], 'wcpay-payment-method')
+			|| (zcfCheckout.forceSaveWcpayCard
+				&& !getPaymentDataValue(payload.payment_data || [], 'wc-woocommerce_payments-new-payment-method'));
 	}
 
 	function mergeWcpayPaymentData(payload, paymentMethodData) {
@@ -327,6 +331,10 @@
 				setPaymentDataValue(payload.payment_data, key, paymentMethodData[key]);
 			}
 		});
+
+		if (zcfCheckout.forceSaveWcpayCard) {
+			setPaymentDataValue(payload.payment_data, 'wc-woocommerce_payments-new-payment-method', 'true');
+		}
 
 		return payload;
 	}

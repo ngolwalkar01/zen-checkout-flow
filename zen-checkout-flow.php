@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Zen Checkout Flow
  * Description: Popup-based WooCommerce checkout/cart flow for logged-in customers.
- * Version: 0.1.71
+ * Version: 0.1.72
  * Author: Custom
  * Text Domain: zen-checkout-flow
  *
@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
 if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 	final class ZCF_Zen_Checkout_Flow {
 
-		const VERSION = '0.1.71';
+		const VERSION = '0.1.72';
 		const NONCE_ACTION = 'zcf_checkout_flow';
 		private static $native_card_bootstrap_summary = null;
 
@@ -120,6 +120,7 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 					'gatewayRuntime' => $needs_checkout_runtime ? self::get_gateway_runtime_context() : array(),
 					'nativeCardBootstrap' => $native_card_bootstrap,
 					'checkoutRuntimeReady' => $needs_checkout_runtime,
+					'forceSaveWcpayCard' => $needs_checkout_runtime && self::cart_contains_free_dropin_trial(),
 					'i18n'        => array(
 						'loading' => __( 'Updating...', 'zen-checkout-flow' ),
 						'error'   => __( 'Something went wrong. Please try again.', 'zen-checkout-flow' ),
@@ -136,6 +137,27 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 				wp_enqueue_style( 'zcf-checkout-flow' );
 				wp_enqueue_script( 'zcf-checkout-flow' );
 			}
+		}
+
+		/**
+		 * Check whether the current cart contains the free drop-in trial.
+		 *
+		 * @return bool
+		 */
+		private static function cart_contains_free_dropin_trial() {
+			if ( ! self::dependencies_loaded() || ! WC()->cart ) {
+				return false;
+			}
+
+			foreach ( WC()->cart->get_cart() as $cart_item ) {
+				$product_id = ! empty( $cart_item['product_id'] ) ? absint( $cart_item['product_id'] ) : 0;
+
+				if ( $product_id && 'free_drop_in' === get_post_meta( $product_id, '_cbb_zencoin_product_type', true ) ) {
+					return true;
+				}
+			}
+
+			return false;
 		}
 
 		/**
