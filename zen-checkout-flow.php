@@ -1738,7 +1738,7 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			</div>
 			<div class="zcf-recovery-offers">
 				<?php foreach ( $offers as $offer ) : ?>
-					<article class="zcf-recovery-card" data-zcf-plan-type="<?php echo esc_attr( $offer['product_type'] ); ?>">
+					<article class="zcf-recovery-card" data-zcf-plan-type="<?php echo esc_attr( 'free_drop_in' === $offer['product_type'] ? 'drop_in' : $offer['product_type'] ); ?>">
 						<div class="zcf-recovery-card__head">
 							<strong><?php echo esc_html( $offer['title'] ); ?></strong>
 							<b><?php echo wp_kses_post( $offer['price_html'] ); ?></b>
@@ -1790,7 +1790,7 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 					'relation' => 'OR',
 					array(
 						'key'     => '_cbb_zencoin_product_type',
-						'value'   => array( 'package', 'drop_in', 'membership' ),
+						'value'   => array( 'package', 'drop_in', 'free_drop_in', 'membership' ),
 						'compare' => 'IN',
 					),
 					array(
@@ -1896,8 +1896,18 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 				return array();
 			}
 
-			if ( ! in_array( $product_type, array( 'package', 'drop_in', 'membership' ), true ) ) {
+			if ( ! in_array( $product_type, array( 'package', 'drop_in', 'free_drop_in', 'membership' ), true ) ) {
 				return array();
+			}
+
+			if ( 'free_drop_in' === $product_type && function_exists( 'cbb_is_free_dropin_trial_available' ) ) {
+				$customer = self::get_checkout_customer_data();
+				$email    = isset( $customer['billing_email'] ) ? $customer['billing_email'] : '';
+				$phone    = isset( $customer['billing_phone'] ) ? $customer['billing_phone'] : '';
+
+				if ( ! cbb_is_free_dropin_trial_available( $email, $phone ) ) {
+					return array();
+				}
 			}
 
 			return array(
@@ -1970,18 +1980,48 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 		 * @return string
 		 */
 		private static function get_recovery_product_validity_label( $product_id, $parent_id ) {
-			$days = (int) get_post_meta( $product_id, '_cbb_zencoin_validity_days', true );
+			$months = get_post_meta( $product_id, '_cbb_zencoin_validity_months', true );
 
-			if ( ! $days && $parent_id !== $product_id ) {
-				$days = (int) get_post_meta( $parent_id, '_cbb_zencoin_validity_days', true );
+			if ( '' === $months && $parent_id !== $product_id ) {
+				$months = get_post_meta( $parent_id, '_cbb_zencoin_validity_months', true );
 			}
 
-			if ( $days > 0 ) {
-				$months = max( 1, (int) round( $days / 30 ) );
+			if ( '' === $months ) {
+				$legacy_days = get_post_meta( $product_id, '_cbb_zencoin_validity_days', true );
 
+				if ( '' === $legacy_days && $parent_id !== $product_id ) {
+					$legacy_days = get_post_meta( $parent_id, '_cbb_zencoin_validity_days', true );
+				}
+
+				if ( '' !== $legacy_days ) {
+					$months = (int) $legacy_days > 0 ? max( 1, (int) round( (int) $legacy_days / 30 ) ) : 0;
+				}
+			}
+
+			if ( '' === $months ) {
+				$meta_product_id = $parent_id ? $parent_id : $product_id;
+				$product_type    = (string) get_post_meta( $meta_product_id, '_cbb_zencoin_product_type', true );
+				$settings        = get_option( 'cbb_zencoin_settings', array() );
+				$settings        = is_array( $settings ) ? $settings : array();
+
+				if ( 'free_drop_in' === $product_type ) {
+					$months = isset( $settings['free_dropin_validity_months'] ) ? absint( $settings['free_dropin_validity_months'] ) : 1;
+				} elseif ( 'drop_in' === $product_type ) {
+					$months = isset( $settings['dropin_validity_months'] ) ? absint( $settings['dropin_validity_months'] ) : 3;
+				} elseif ( 'package' === $product_type ) {
+					$package_size = (string) get_post_meta( $meta_product_id, '_cbb_zencoin_package_size', true );
+					$setting_key  = 'large' === $package_size ? 'package_large_validity_months' : ( 'medium' === $package_size ? 'package_medium_validity_months' : 'package_small_validity_months' );
+					$default      = 'large' === $package_size ? 6 : 3;
+					$months       = isset( $settings[ $setting_key ] ) ? absint( $settings[ $setting_key ] ) : $default;
+				}
+			}
+
+			$months = absint( $months );
+
+			if ( $months > 0 ) {
 				return sprintf(
 					/* translators: %s: number of months. */
-					__( 'Valid for %s Month', 'zen-checkout-flow' ),
+					_n( 'Valid for %s Month', 'Valid for %s Months', $months, 'zen-checkout-flow' ),
 					$months
 				);
 			}
