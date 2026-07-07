@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Zen Checkout Flow
  * Description: Popup-based WooCommerce checkout/cart flow for logged-in customers.
- * Version: 0.1.72
+ * Version: 0.1.73
  * Author: Custom
  * Text Domain: zen-checkout-flow
  *
@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
 if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 	final class ZCF_Zen_Checkout_Flow {
 
-		const VERSION = '0.1.72';
+		const VERSION = '0.1.73';
 		const NONCE_ACTION = 'zcf_checkout_flow';
 		private static $native_card_bootstrap_summary = null;
 
@@ -2960,6 +2960,10 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			$context = self::get_checkout_context();
 			$mode    = isset( $context['mode'] ) ? $context['mode'] : 'money_purchase';
 
+			if ( self::get_context_booking_count( $context ) > 1 ) {
+				wp_send_json_error( array( 'message' => __( 'Please book one class, workshop, event, or Fire & Ice session at a time.', 'zen-checkout-flow' ) ) );
+			}
+
 			if ( 'zencoin_booking' !== $mode ) {
 				wp_send_json_error( array( 'message' => __( 'This booking is not currently covered by your Zencoin wallet.', 'zen-checkout-flow' ) ) );
 			}
@@ -3111,6 +3115,26 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 					'step'          => self::normalize_step( self::get_ajax_step() ),
 				)
 			);
+		}
+
+		/**
+		 * Count booking units from a CBB checkout context.
+		 *
+		 * @param array $context Checkout context.
+		 * @return int
+		 */
+		private static function get_context_booking_count( $context ) {
+			$count = 0;
+
+			if ( empty( $context['booking_items'] ) || ! is_array( $context['booking_items'] ) ) {
+				return 0;
+			}
+
+			foreach ( $context['booking_items'] as $booking_item ) {
+				$count += isset( $booking_item['quantity'] ) ? max( 1, absint( $booking_item['quantity'] ) ) : 1;
+			}
+
+			return $count;
 		}
 
 		/**
