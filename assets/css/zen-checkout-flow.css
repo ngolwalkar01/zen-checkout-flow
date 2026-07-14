@@ -1438,6 +1438,11 @@ body.zcf-popup-open {
 	font-size: 16px;
 }
 
+.zcf-success-actions .zcf-result-button.is-primary {
+	background: var(--zcf-gold);
+	color: #3f3f42;
+}
+
 .zcf-success-actions .zcf-result-button.is-primary::after {
 	content: "";
 	width: 16px;
@@ -1448,18 +1453,52 @@ body.zcf-popup-open {
 	transform: rotate(45deg);
 }
 
-.zcf-order-card .zcf-product-main {
-	border-bottom: 0;
-	padding-bottom: 0;
+.zcf-success-actions .zcf-result-button.is-primary:hover,
+.zcf-success-actions .zcf-result-button.is-primary:focus-visible {
+	background: #edca60;
 }
 
-.zcf-order-card__status {
-	margin-top: 14px;
-	padding-top: 14px;
-	border-top: 1px solid rgba(244, 241, 232, 0.5);
-	color: var(--zcf-gold);
+.zcf-order-card .zcf-product-main {
+	border-bottom: 1px solid rgba(244, 241, 232, 0.5);
+	padding-bottom: 16px;
+}
+
+.zcf-order-booking-card {
+	border-radius: 22px;
+}
+
+.zcf-booking-card__actions {
+	display: grid;
+	gap: 10px;
+	margin-top: 20px;
+}
+
+.zcf-booking-card__button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 44px;
+	width: 100%;
+	border: 2px solid rgba(244, 241, 232, 0.68);
+	border-radius: 999px;
+	background: transparent;
+	color: rgba(244, 241, 232, 0.86);
 	font-size: 14px;
 	font-weight: 800;
+	line-height: 1.1;
+	text-align: center;
+	text-decoration: none;
+}
+
+.zcf-booking-card__button.is-cancel {
+	border-color: var(--zcf-gold);
+	color: var(--zcf-gold);
+}
+
+.zcf-booking-card__button:hover,
+.zcf-booking-card__button:focus-visible {
+	background: rgba(255, 255, 255, 0.04);
+	outline: none;
 }
 
 @media (max-width: 980px) {

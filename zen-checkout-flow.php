@@ -807,6 +807,7 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 					'primary'   => array(
 						'label'  => __( 'To Schedule', 'zen-checkout-flow' ),
 						'action' => 'schedule',
+								'url'    => self::get_schedule_url(),
 					),
 					'secondary' => array(
 						'label'  => __( 'Profile', 'zen-checkout-flow' ),
@@ -832,6 +833,7 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 					'primary'   => array(
 						'label'  => __( 'Schedule', 'zen-checkout-flow' ),
 						'action' => 'schedule',
+								'url'    => self::get_schedule_url(),
 					),
 					'secondary' => array(
 						'label'  => __( 'Cancel', 'zen-checkout-flow' ),
@@ -844,6 +846,7 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 					'primary'   => array(
 						'label'  => __( 'Schedule', 'zen-checkout-flow' ),
 						'action' => 'schedule',
+								'url'    => self::get_schedule_url(),
 					),
 					'secondary' => array(
 						'label'  => __( 'Profile', 'zen-checkout-flow' ),
@@ -863,6 +866,7 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 				'primary'   => array(
 					'label'  => __( 'Schedule', 'zen-checkout-flow' ),
 					'action' => 'schedule',
+								'url'    => self::get_schedule_url(),
 				),
 				'secondary' => array(
 					'label'  => __( 'Profile', 'zen-checkout-flow' ),
@@ -890,11 +894,22 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 
 			$class = $is_secondary ? 'zcf-result-button is-secondary' : 'zcf-result-button is-primary';
 
-			if ( 'profile' === $action && $url ) {
-				return '<a class="' . esc_attr( $class ) . '" href="' . esc_url( $url ) . '">' . esc_html( $label ) . '</a>';
+			if ( $url ) {
+				return '<a class="' . esc_attr( $class ) . '" href="' . esc_url( $url ) . '" data-zcf-result-link-action="' . esc_attr( $action ) . '">' . esc_html( $label ) . '</a>';
 			}
 
 			return '<button type="button" class="' . esc_attr( $class ) . '" data-zcf-result-action="' . esc_attr( $action ) . '">' . esc_html( $label ) . '</button>';
+		}
+
+		/**
+		 * Get the schedule destination used by checkout result actions.
+		 *
+		 * @return string
+		 */
+		private static function get_schedule_url() {
+			$url = self::dependencies_loaded() ? wc_get_page_permalink( 'shop' ) : home_url( '/' );
+
+			return apply_filters( 'zenctuary_bookings_book_class_url', $url );
 		}
 
 		/**
@@ -1063,10 +1078,15 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 		 * @return string
 		 */
 		private static function render_order_item_card( $item_id, $item, $order ) {
-			$product  = $item->get_product();
-			$quantity = max( 1, (int) $item->get_quantity() );
-			$subtotal = $order->get_formatted_line_subtotal( $item );
-			$coin_cost = $item->get_meta( '_cbb_coin_item_cost', true );
+			if ( self::is_booking_order_item( $item_id, $item ) ) {
+				return self::render_order_booking_item_card( $item_id, $item );
+			}
+
+			$product        = $item->get_product();
+			$quantity       = max( 1, (int) $item->get_quantity() );
+			$subtotal       = $order->get_formatted_line_subtotal( $item );
+			$zencoin_grant  = self::get_product_zencoin_grant_label( $product );
+			$validity_label = self::get_product_zencoin_validity_label( $product );
 
 			ob_start();
 			?>
@@ -1074,31 +1094,82 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 				<div class="zcf-product-main">
 					<div>
 						<h3><?php echo esc_html( $item->get_name() ); ?></h3>
-						<div class="zcf-product-meta">
-							<?php
-							echo esc_html(
-								$coin_cost
-									? sprintf( __( 'Zencoin booking cost: %s ZC', 'zen-checkout-flow' ), wc_format_decimal( $coin_cost, 2 ) )
-									: sprintf( __( 'Quantity: %d', 'zen-checkout-flow' ), $quantity )
-							);
-							?>
-						</div>
+						<div class="zcf-product-meta"><?php echo esc_html( sprintf( __( 'Quantity: %d', 'zen-checkout-flow' ), $quantity ) ); ?></div>
+						<?php if ( $validity_label ) : ?>
+							<div class="zcf-product-validity"><?php echo esc_html( $validity_label ); ?></div>
+						<?php endif; ?>
 					</div>
 					<div class="zcf-product-price">
 						<strong><?php echo wp_kses_post( $subtotal ); ?></strong>
-						<?php echo $product ? self::render_price_suffix( $product ) : ''; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+						<?php if ( '' !== $zencoin_grant ) : ?>
+							<div class="zcf-product-zencoins">
+								<span><?php esc_html_e( 'ZENCOINS:', 'zen-checkout-flow' ); ?></span>
+								<?php echo self::render_zencoin_badge( $zencoin_grant ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+							</div>
+						<?php else : ?>
+							<?php echo $product ? self::render_price_suffix( $product ) : ''; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+						<?php endif; ?>
 					</div>
 				</div>
 
-				<?php if ( self::is_booking_order_item( $item_id, $item ) ) : ?>
-					<div class="zcf-order-card__status"><?php esc_html_e( 'Booked', 'zen-checkout-flow' ); ?></div>
-				<?php else : ?>
-					<details class="zcf-more">
-						<summary><?php esc_html_e( 'more information', 'zen-checkout-flow' ); ?></summary>
-						<div class="zcf-more-body">
-							<?php echo wp_kses_post( wc_display_item_meta( $item, array( 'echo' => false ) ) ); ?>
-						</div>
-					</details>
+				<details class="zcf-more">
+					<summary><?php esc_html_e( 'more information', 'zen-checkout-flow' ); ?></summary>
+					<div class="zcf-more-body">
+						<?php echo wp_kses_post( wc_display_item_meta( $item, array( 'echo' => false ) ) ); ?>
+					</div>
+				</details>
+			</article>
+			<?php
+			return ob_get_clean();
+		}
+
+		/**
+		 * Render a post-checkout booking card.
+		 *
+		 * @param int                   $item_id Order item ID.
+		 * @param WC_Order_Item_Product $item    Order item.
+		 * @return string
+		 */
+		private static function render_order_booking_item_card( $item_id, $item ) {
+			$summary = self::get_booking_order_item_summary( $item_id, $item );
+
+			ob_start();
+			?>
+			<article class="zcf-product-card zcf-product-card--booking zcf-order-booking-card" data-order-item-id="<?php echo esc_attr( $item_id ); ?>">
+				<div class="zcf-booking-card__head">
+					<h3><?php echo esc_html( $item->get_name() ); ?></h3>
+					<?php if ( '' !== $summary['zencoins'] ) : ?>
+						<?php echo self::render_zencoin_badge( $summary['zencoins'] ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+					<?php endif; ?>
+				</div>
+
+				<div class="zcf-booking-card__meta">
+					<?php if ( $summary['date'] ) : ?>
+						<div class="zcf-booking-card__row"><?php echo self::render_booking_meta_icon( 'date' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?><span><?php echo esc_html( $summary['date'] ); ?></span></div>
+					<?php endif; ?>
+					<?php if ( $summary['timeslot'] ) : ?>
+						<div class="zcf-booking-card__row"><?php echo self::render_booking_meta_icon( 'time' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?><span><?php echo esc_html( $summary['timeslot'] ); ?></span></div>
+					<?php endif; ?>
+					<?php if ( $summary['space'] ) : ?>
+						<div class="zcf-booking-card__row"><?php echo self::render_booking_meta_icon( 'space' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?><span><?php echo esc_html( $summary['space'] ); ?></span></div>
+					<?php endif; ?>
+					<?php if ( $summary['type'] ) : ?>
+						<div class="zcf-booking-card__row"><?php echo self::render_booking_meta_icon( 'type' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?><span><?php echo esc_html( $summary['type'] ); ?></span></div>
+					<?php endif; ?>
+					<?php if ( $summary['instructor'] ) : ?>
+						<div class="zcf-booking-card__instructor"><?php echo esc_html( $summary['instructor'] ); ?></div>
+					<?php endif; ?>
+				</div>
+
+				<?php if ( $summary['calendar_url'] || $summary['cancel_url'] ) : ?>
+					<div class="zcf-booking-card__actions">
+						<?php if ( $summary['calendar_url'] ) : ?>
+							<a class="zcf-booking-card__button is-calendar" href="<?php echo esc_attr( $summary['calendar_url'] ); ?>" download="zenctuary-booking-<?php echo esc_attr( $summary['booking_id'] ); ?>.ics"><?php esc_html_e( 'Add to calendar', 'zen-checkout-flow' ); ?></a>
+						<?php endif; ?>
+						<?php if ( $summary['cancel_url'] ) : ?>
+							<a class="zcf-booking-card__button is-cancel" href="<?php echo esc_url( $summary['cancel_url'] ); ?>"><?php esc_html_e( 'Cancel Class', 'zen-checkout-flow' ); ?></a>
+						<?php endif; ?>
+					</div>
 				<?php endif; ?>
 			</article>
 			<?php
@@ -1266,6 +1337,166 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			}
 
 			return false;
+		}
+
+		/**
+		 * Build a friendly booking summary for post-checkout rendering.
+		 *
+		 * @param int                   $item_id Order item ID.
+		 * @param WC_Order_Item_Product $item    Order item.
+		 * @return array
+		 */
+		private static function get_booking_order_item_summary( $item_id, $item ) {
+			$product     = $item ? $item->get_product() : false;
+			$booking     = self::get_booking_from_order_item( $item_id );
+			$start       = 0;
+			$end         = 0;
+			$resource_id = 0;
+			$booking_id  = 0;
+
+			if ( $booking ) {
+				$booking_id  = method_exists( $booking, 'get_id' ) ? (int) $booking->get_id() : 0;
+				$start       = method_exists( $booking, 'get_start' ) ? (int) $booking->get_start( 'edit' ) : 0;
+				$end         = method_exists( $booking, 'get_end' ) ? (int) $booking->get_end( 'edit' ) : 0;
+				$resource_id = method_exists( $booking, 'get_resource_id' ) ? (int) $booking->get_resource_id( 'edit' ) : 0;
+
+				if ( method_exists( $booking, 'get_product' ) ) {
+					$booking_product = $booking->get_product();
+
+					if ( $booking_product ) {
+						$product = $booking_product;
+					}
+				}
+			}
+
+			$date_format = function_exists( 'wc_bookings_date_format' ) ? wc_bookings_date_format() : get_option( 'date_format' );
+			$time_format = function_exists( 'wc_bookings_time_format' ) ? wc_bookings_time_format() : get_option( 'time_format' );
+			$date        = $start ? date_i18n( $date_format, $start ) : '';
+			$time        = '';
+
+			if ( $start ) {
+				$time = date_i18n( $time_format, $start );
+
+				if ( $end && $end > $start ) {
+					$time .= ' - ' . date_i18n( $time_format, $end );
+					$duration_minutes = (int) round( ( $end - $start ) / MINUTE_IN_SECONDS );
+
+					if ( $duration_minutes > 0 ) {
+						$time .= ' (' . sprintf( _n( '%dmin', '%dmin', $duration_minutes, 'zen-checkout-flow' ), $duration_minutes ) . ')';
+					}
+				}
+			}
+
+			$coin_cost = $item ? $item->get_meta( '_cbb_coin_item_cost', true ) : '';
+
+			return array(
+				'booking_id'   => $booking_id,
+				'date'         => $date,
+				'timeslot'     => $time,
+				'space'        => $resource_id ? get_the_title( $resource_id ) : '',
+				'type'         => self::get_booking_type_label( $product ),
+				'instructor'   => self::get_booking_instructor_label( $product ),
+				'zencoins'     => '' !== (string) $coin_cost ? wc_format_decimal( $coin_cost, 0 ) : self::get_booking_coin_cost_label( $product ),
+				'calendar_url' => $booking ? self::get_booking_calendar_url( $booking, $product ) : '',
+				'cancel_url'   => self::get_booking_cancel_url( $booking ),
+			);
+		}
+
+		/**
+		 * Get the first WooCommerce Booking object attached to an order item.
+		 *
+		 * @param int $item_id Order item ID.
+		 * @return WC_Booking|false
+		 */
+		private static function get_booking_from_order_item( $item_id ) {
+			if ( ! class_exists( 'WC_Booking_Data_Store' ) || ! function_exists( 'get_wc_booking' ) ) {
+				return false;
+			}
+
+			$booking_ids = WC_Booking_Data_Store::get_booking_ids_from_order_item_id( $item_id );
+			$booking_id  = ! empty( $booking_ids ) ? absint( reset( $booking_ids ) ) : 0;
+
+			return $booking_id ? get_wc_booking( $booking_id ) : false;
+		}
+
+		/**
+		 * Get an inline calendar download URL for a booking.
+		 *
+		 * @param WC_Booking       $booking Booking object.
+		 * @param WC_Product|false $product Booking product.
+		 * @return string
+		 */
+		private static function get_booking_calendar_url( $booking, $product ) {
+			if ( ! $booking || ! method_exists( $booking, 'get_start' ) || ! method_exists( $booking, 'get_end' ) ) {
+				return '';
+			}
+
+			$start = (int) $booking->get_start( 'edit' );
+			$end   = (int) $booking->get_end( 'edit' );
+
+			if ( $start <= 0 ) {
+				return '';
+			}
+
+			if ( $end <= $start ) {
+				$end = $start + HOUR_IN_SECONDS;
+			}
+
+			$title       = $product instanceof WC_Product ? $product->get_name() : __( 'Zenctuary booking', 'zen-checkout-flow' );
+			$resource_id = method_exists( $booking, 'get_resource_id' ) ? (int) $booking->get_resource_id( 'edit' ) : 0;
+			$location    = $resource_id ? get_the_title( $resource_id ) : '';
+			$lines       = array(
+				'BEGIN:VCALENDAR',
+				'VERSION:2.0',
+				'PRODID:-//Zenctuary//Checkout//EN',
+				'BEGIN:VEVENT',
+				'UID:zenctuary-booking-' . ( method_exists( $booking, 'get_id' ) ? $booking->get_id() : $start ) . '@zenctuary',
+				'DTSTAMP:' . gmdate( 'Ymd\THis\Z' ),
+				'DTSTART:' . gmdate( 'Ymd\THis\Z', $start ),
+				'DTEND:' . gmdate( 'Ymd\THis\Z', $end ),
+				'SUMMARY:' . self::escape_ics_text( $title ),
+			);
+
+			if ( $location ) {
+				$lines[] = 'LOCATION:' . self::escape_ics_text( $location );
+			}
+
+			$lines[] = 'END:VEVENT';
+			$lines[] = 'END:VCALENDAR';
+
+			return 'data:text/calendar;charset=utf8,' . rawurlencode( implode( "\r\n", $lines ) );
+		}
+
+		/**
+		 * Escape text for an ICS field value.
+		 *
+		 * @param string $text Text value.
+		 * @return string
+		 */
+		private static function escape_ics_text( $text ) {
+			$text = wp_strip_all_tags( (string) $text );
+
+			return str_replace( array( '\\', ';', ',', "\r", "\n" ), array( '\\\\', '\\;', '\\,', '', '\\n' ), $text );
+		}
+
+		/**
+		 * Get a safe cancel URL for a future booking.
+		 *
+		 * @param WC_Booking|false $booking Booking object.
+		 * @return string
+		 */
+		private static function get_booking_cancel_url( $booking ) {
+			if ( ! $booking || ! method_exists( $booking, 'get_cancel_url' ) || ! method_exists( $booking, 'get_start' ) ) {
+				return '';
+			}
+
+			$start = (int) $booking->get_start( 'edit' );
+
+			if ( $start <= current_time( 'timestamp' ) ) {
+				return '';
+			}
+
+			return $booking->get_cancel_url();
 		}
 
 		/**

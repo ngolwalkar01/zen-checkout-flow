@@ -1043,6 +1043,10 @@
 		}
 	});
 
+	$(document).on('click', '[data-zcf-result-link-action="schedule"]', function () {
+		$(document).trigger('zenCheckoutFlow:schedule');
+	});
+
 	$(document).on('click', '[data-zcf-result-action]', function () {
 		var action = $(this).data('zcf-result-action');
 		var $stage = getPopupStage();
