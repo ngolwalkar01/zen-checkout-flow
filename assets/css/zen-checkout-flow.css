@@ -377,9 +377,9 @@ body.zcf-popup-open {
 	box-shadow: inset 0 0 0 4px rgba(226, 190, 82, 0.16);
 }
 
-.zcf-booking-card__head .zen-coin-global__ring {
+/*.zcf-booking-card__head .zen-coin-global__ring {
 	border-color: var(--zcf-gold);
-}
+}*/
 
 .zcf-booking-card__meta {
 	display: grid;
