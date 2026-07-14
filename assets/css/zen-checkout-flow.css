@@ -1474,20 +1474,21 @@ body.zcf-popup-open {
 }
 
 .zcf-booking-card__button {
-	display: inline-flex;
 	align-items: center;
-	justify-content: center;
-	min-height: 44px;
-	width: 100%;
-	border: 2px solid rgba(244, 241, 232, 0.68);
-	border-radius: 999px;
 	background: transparent;
-	color: rgba(244, 241, 232, 0.86);
+	border: 2px solid rgb(216 179 84);
+	border-radius: 999px;
+	color: #d8b354;
+	display: inline-flex;
 	font-size: 14px;
 	font-weight: 800;
+	justify-content: center;
 	line-height: 1.1;
+	min-height: 44px;
+	padding: 10px 18px;
 	text-align: center;
 	text-decoration: none;
+	width: 100%;
 }
 
 .zcf-booking-card__button.is-cancel {
