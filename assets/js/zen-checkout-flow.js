@@ -20,6 +20,10 @@
 	}
 
 	function updateFragments($shell, data) {
+		if (!options.preserveCart) {
+			clearCartOnPopupClose();
+		}
+
 		parkPersistentCheckoutHost();
 
 		if (Object.prototype.hasOwnProperty.call(data, 'cartCount')) {
@@ -853,8 +857,35 @@
 		}
 	}
 
+	function shouldClearCartOnPopupClose() {
+		return !getPopupStage().find('.zcf-success-modal').length;
+	}
+
+	function clearCartOnPopupClose() {
+		if (!zcfCheckout.ajaxUrl || !zcfCheckout.nonce || !shouldClearCartOnPopupClose()) {
+			return;
+		}
+
+		$.ajax({
+			type: 'POST',
+			url: zcfCheckout.ajaxUrl,
+			data: {
+				action: 'zcf_clear_cart_on_close',
+				nonce: zcfCheckout.nonce
+			}
+		}).done(function (response) {
+			if (response && response.success && response.data && Object.prototype.hasOwnProperty.call(response.data, 'cartCount')) {
+				notifyCartCount(response.data.cartCount);
+			}
+		});
+	}
+
 	function closePopup(options) {
 		options = options || {};
+
+		if (!options.preserveCart) {
+			clearCartOnPopupClose();
+		}
 
 		parkPersistentCheckoutHost();
 		getPopup().removeClass('is-active').attr('aria-hidden', 'true');
@@ -1039,7 +1070,7 @@
 
 	$(document).on('click', '[data-zcf-login]', function () {
 		if (openThemeLoginPopup()) {
-			closePopup({ suppressRedirect: true });
+			closePopup({ suppressRedirect: true, preserveCart: true });
 		}
 	});
 

@@ -43,6 +43,8 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			add_action( 'wp_ajax_zcf_apply_coupon', array( __CLASS__, 'ajax_apply_coupon' ) );
 			add_action( 'wp_ajax_zcf_remove_coupon', array( __CLASS__, 'ajax_remove_coupon' ) );
 			add_action( 'wp_ajax_zcf_remove_cart_item', array( __CLASS__, 'ajax_remove_cart_item' ) );
+			add_action( 'wp_ajax_zcf_clear_cart_on_close', array( __CLASS__, 'ajax_clear_cart_on_close' ) );
+			add_action( 'wp_ajax_nopriv_zcf_clear_cart_on_close', array( __CLASS__, 'ajax_clear_cart_on_close' ) );
 			add_action( 'wp_ajax_zcf_choose_payment_method', array( __CLASS__, 'ajax_choose_payment_method' ) );
 			add_action( 'wp_ajax_zcf_book_with_zencoins', array( __CLASS__, 'ajax_book_with_zencoins' ) );
 			add_action( 'wp_ajax_zcf_add_recovery_product', array( __CLASS__, 'ajax_add_recovery_product' ) );
@@ -3125,6 +3127,26 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			WC()->cart->calculate_totals();
 
 			self::send_fragments();
+		}
+
+		/**
+		 * Clear the cart when a customer dismisses the popup before checkout.
+		 */
+		public static function ajax_clear_cart_on_close() {
+			self::verify_ajax( false );
+
+			if ( ! WC()->cart ) {
+				wp_send_json_error( array( 'message' => __( 'Your cart is unavailable.', 'zen-checkout-flow' ) ) );
+			}
+
+			WC()->cart->empty_cart();
+			WC()->cart->calculate_totals();
+
+			wp_send_json_success(
+				array(
+					'cartCount' => 0,
+				)
+			);
 		}
 
 		/**
