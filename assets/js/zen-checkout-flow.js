@@ -916,7 +916,8 @@
 				action: 'zcf_add_recovery_product',
 				nonce: zcfCheckout.nonce,
 				product_id: $button.data('product-id') || 0,
-				variation_id: $button.data('variation-id') || 0
+				variation_id: $button.data('variation-id') || 0,
+				member_recovery: $button.data('zcf-member-recovery') ? 1 : 0
 			}
 		})
 			.done(function (response) {

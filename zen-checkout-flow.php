@@ -49,6 +49,9 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			add_action( 'wp_ajax_zcf_book_with_zencoins', array( __CLASS__, 'ajax_book_with_zencoins' ) );
 			add_action( 'wp_ajax_zcf_add_recovery_product', array( __CLASS__, 'ajax_add_recovery_product' ) );
 			add_action( 'wp_ajax_zcf_remove_recovery_products', array( __CLASS__, 'ajax_remove_recovery_products' ) );
+			add_filter( 'woocommerce_add_cart_item', array( __CLASS__, 'apply_member_recovery_cart_item_price' ), 1000, 1 );
+			add_filter( 'woocommerce_get_cart_item_from_session', array( __CLASS__, 'restore_member_recovery_cart_item_price' ), 1000, 3 );
+			add_action( 'woocommerce_before_calculate_totals', array( __CLASS__, 'apply_member_recovery_cart_prices' ), 1000 );
 
 			if ( is_admin() ) {
 				add_action( 'admin_notices', array( __CLASS__, 'maybe_dependency_notice' ) );
@@ -1923,7 +1926,7 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			$available = isset( $context['available_zencoins'] ) ? (float) $context['available_zencoins'] : 0.0;
 			$missing   = isset( $context['missing_zencoins'] ) ? (float) $context['missing_zencoins'] : 0.0;
 			$offers    = self::get_recovery_product_offers( $missing );
-			$best      = self::get_best_recovery_offer( $offers, $missing );
+			$best      = self::get_member_recovery_offer( $missing, $offers );
 			$is_zero   = 'choose_plan' === self::resolve_frame_step( $context, $step );
 
 			ob_start();
@@ -1949,7 +1952,7 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 						</p>
 						<div class="zcf-shortage-prompt__actions">
 							<?php if ( $best ) : ?>
-								<button type="button" class="zcf-result-button is-primary" data-zcf-add-recovery-product data-product-id="<?php echo esc_attr( $best['product_id'] ); ?>" data-variation-id="<?php echo esc_attr( $best['variation_id'] ); ?>">
+								<button type="button" class="zcf-result-button is-primary" data-zcf-add-recovery-product data-zcf-member-recovery="1" data-product-id="<?php echo esc_attr( $best['product_id'] ); ?>" data-variation-id="<?php echo esc_attr( $best['variation_id'] ); ?>">
 									<?php echo esc_html( sprintf( __( 'Buy %s', 'zen-checkout-flow' ), $best['zencoins_label'] ) ); ?>
 								</button>
 							<?php else : ?>
@@ -2299,6 +2302,383 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			}
 
 			return array();
+		}
+
+		/**
+		 * Build the member-only exact recovery offer from the active membership rate.
+		 *
+		 * @param float $missing Missing ZC.
+		 * @param array $offers  Existing recovery offers to use as the cart container.
+		 * @return array
+		 */
+		private static function get_member_recovery_offer( $missing, $offers = array() ) {
+			$missing = self::normalize_recovery_amount( $missing );
+
+			if ( $missing <= 0 ) {
+				return array();
+			}
+
+			$membership = self::get_active_user_membership();
+
+			if ( ! $membership ) {
+				return array();
+			}
+
+			$rate = self::get_active_membership_zencoin_rate( $membership );
+
+			if ( empty( $rate['price_per_zencoin'] ) || (float) $rate['price_per_zencoin'] <= 0 ) {
+				return array();
+			}
+
+			$container = self::get_member_recovery_container_offer( $offers );
+
+			if ( empty( $container ) ) {
+				return array();
+			}
+
+			$price = round( $missing * (float) $rate['price_per_zencoin'], wc_get_price_decimals() );
+
+			return array_merge(
+				$container,
+				array(
+					'is_member_recovery'    => true,
+					'title'                 => __( 'Member Zencoin Top-up', 'zen-checkout-flow' ),
+					'price_html'            => wc_price( $price ),
+					'price_value'           => $price,
+					'product_type'          => 'package',
+					'zencoins'              => $missing,
+					'zencoins_label'        => self::format_recovery_amount_label( $missing ),
+					'eur_per_zencoin_label' => self::format_offer_euro_per_zencoin_label( $price, $missing ),
+					'validity_label'        => ! empty( $rate['membership_name'] ) ? sprintf( __( 'Member rate: %s', 'zen-checkout-flow' ), $rate['membership_name'] ) : __( 'Member rate', 'zen-checkout-flow' ),
+				)
+			);
+		}
+
+		/**
+		 * Pick a real purchasable product to carry a dynamic member top-up line.
+		 *
+		 * @param array $offers Recovery offers.
+		 * @return array
+		 */
+		private static function get_member_recovery_container_offer( $offers ) {
+			foreach ( (array) $offers as $offer ) {
+				$product_type = isset( $offer['product_type'] ) ? (string) $offer['product_type'] : '';
+
+				if ( in_array( $product_type, array( 'package', 'drop_in' ), true ) ) {
+					return $offer;
+				}
+			}
+
+			return array();
+		}
+
+		/**
+		 * Get the active membership for the current user.
+		 *
+		 * @param int $user_id User ID.
+		 * @return object|null
+		 */
+		private static function get_active_user_membership( $user_id = 0 ) {
+			$user_id = $user_id ? absint( $user_id ) : get_current_user_id();
+
+			if ( ! $user_id || ! function_exists( 'wc_memberships_get_user_memberships' ) ) {
+				return null;
+			}
+
+			$memberships = function_exists( 'wc_memberships_get_user_active_memberships' ) ? wc_memberships_get_user_active_memberships( $user_id ) : wc_memberships_get_user_memberships( $user_id );
+
+			if ( empty( $memberships ) ) {
+				return null;
+			}
+
+			$memberships = array_filter(
+				(array) $memberships,
+				static function( $membership ) {
+					if ( ! is_object( $membership ) || ! is_callable( array( $membership, 'get_plan' ) ) || ! $membership->get_plan() ) {
+						return false;
+					}
+
+					if ( is_callable( array( $membership, 'is_active' ) ) ) {
+						return (bool) $membership->is_active();
+					}
+
+					if ( is_callable( array( $membership, 'get_status' ) ) ) {
+						return 'active' === (string) $membership->get_status();
+					}
+
+					return true;
+				}
+			);
+
+			usort(
+				$memberships,
+				static function( $a, $b ) {
+					$a_start = is_callable( array( $a, 'get_local_start_date' ) ) ? (int) $a->get_local_start_date( 'timestamp' ) : 0;
+					$b_start = is_callable( array( $b, 'get_local_start_date' ) ) ? (int) $b->get_local_start_date( 'timestamp' ) : 0;
+
+					return $b_start <=> $a_start;
+				}
+			);
+
+			return ! empty( $memberships ) ? $memberships[0] : null;
+		}
+
+		/**
+		 * Resolve the active membership EUR/Zencoin rate.
+		 *
+		 * @param object $membership User membership.
+		 * @return array
+		 */
+		private static function get_active_membership_zencoin_rate( $membership ) {
+			$subscription = self::get_membership_subscription( $membership );
+			$rate         = $subscription ? self::get_subscription_zencoin_rate( $subscription ) : array();
+
+			if ( empty( $rate ) ) {
+				$rate = self::get_membership_plan_zencoin_rate( $membership );
+			}
+
+			if ( empty( $rate ) || empty( $rate['price_per_zencoin'] ) ) {
+				return array();
+			}
+
+			if ( empty( $rate['membership_name'] ) && is_callable( array( $membership, 'get_plan' ) ) && $membership->get_plan() ) {
+				$plan = $membership->get_plan();
+				$rate['membership_name'] = is_callable( array( $plan, 'get_name' ) ) ? $plan->get_name() : '';
+			}
+
+			return $rate;
+		}
+
+		/**
+		 * Get linked subscription for a membership, when available.
+		 *
+		 * @param object $membership User membership.
+		 * @return WC_Subscription|null
+		 */
+		private static function get_membership_subscription( $membership ) {
+			if ( is_object( $membership ) && is_callable( array( $membership, 'get_subscription' ) ) ) {
+				$subscription = $membership->get_subscription();
+
+				if ( $subscription instanceof WC_Subscription ) {
+					return $subscription;
+				}
+			}
+
+			if ( function_exists( 'wc_memberships' ) && is_callable( array( wc_memberships(), 'get_integrations_instance' ) ) ) {
+				$integrations  = wc_memberships()->get_integrations_instance();
+				$subscriptions = $integrations && is_callable( array( $integrations, 'get_subscriptions_instance' ) ) ? $integrations->get_subscriptions_instance() : null;
+
+				if ( $subscriptions && is_callable( array( $subscriptions, 'get_subscription_from_membership' ) ) ) {
+					$subscription = $subscriptions->get_subscription_from_membership( $membership );
+
+					if ( $subscription instanceof WC_Subscription ) {
+						return $subscription;
+					}
+				}
+			}
+
+			return null;
+		}
+
+		/**
+		 * Get the rate from subscription line items.
+		 *
+		 * @param WC_Subscription $subscription Subscription.
+		 * @return array
+		 */
+		private static function get_subscription_zencoin_rate( $subscription ) {
+			if ( ! $subscription || ! is_callable( array( $subscription, 'get_items' ) ) ) {
+				return array();
+			}
+
+			foreach ( $subscription->get_items( 'line_item' ) as $item ) {
+				$product = is_callable( array( $item, 'get_product' ) ) ? $item->get_product() : null;
+				$coins   = self::get_membership_product_grant_amount( $product );
+
+				if ( $coins <= 0 ) {
+					continue;
+				}
+
+				$quantity = is_callable( array( $item, 'get_quantity' ) ) ? max( 1, (float) $item->get_quantity() ) : 1;
+				$price    = is_callable( array( $item, 'get_total' ) ) ? (float) $item->get_total() : 0.0;
+
+				if ( $price <= 0 && is_callable( array( $item, 'get_subtotal' ) ) ) {
+					$price = (float) $item->get_subtotal();
+				}
+
+				if ( $price <= 0 && $product instanceof WC_Product ) {
+					$price = (float) wc_get_price_to_display( $product ) * $quantity;
+				}
+
+				if ( $price <= 0 ) {
+					continue;
+				}
+
+				return array(
+					'price_per_zencoin' => $price / ( $coins * $quantity ),
+					'membership_name'   => $product instanceof WC_Product ? wp_strip_all_tags( $product->get_name() ) : '',
+				);
+			}
+
+			return array();
+		}
+
+		/**
+		 * Get the rate from the membership plan's linked products.
+		 *
+		 * @param object $membership User membership.
+		 * @return array
+		 */
+		private static function get_membership_plan_zencoin_rate( $membership ) {
+			if ( ! is_object( $membership ) || ! is_callable( array( $membership, 'get_plan' ) ) || ! $membership->get_plan() ) {
+				return array();
+			}
+
+			$plan        = $membership->get_plan();
+			$product_ids = array();
+
+			if ( is_callable( array( $plan, 'get_product_ids' ) ) ) {
+				$product_ids = array_merge( $product_ids, (array) $plan->get_product_ids() );
+			}
+
+			if ( is_callable( array( $plan, 'get_product_id' ) ) ) {
+				$product_ids[] = $plan->get_product_id();
+			}
+
+			$product_ids = array_unique( array_filter( array_map( 'absint', $product_ids ) ) );
+
+			foreach ( $product_ids as $product_id ) {
+				$product = wc_get_product( $product_id );
+				$coins   = self::get_membership_product_grant_amount( $product );
+				$price   = $product instanceof WC_Product ? (float) wc_get_price_to_display( $product ) : 0.0;
+
+				if ( $coins > 0 && $price > 0 ) {
+					return array(
+						'price_per_zencoin' => $price / $coins,
+						'membership_name'   => is_callable( array( $plan, 'get_name' ) ) ? $plan->get_name() : wp_strip_all_tags( $product->get_name() ),
+					);
+				}
+			}
+
+			return array();
+		}
+
+		/**
+		 * Get Zencoin grant amount from a membership product or variation.
+		 *
+		 * @param WC_Product|null $product Product.
+		 * @return float
+		 */
+		private static function get_membership_product_grant_amount( $product ) {
+			if ( ! $product instanceof WC_Product ) {
+				return 0.0;
+			}
+
+			$product_id = $product->get_id();
+			$parent_id  = is_callable( array( $product, 'get_parent_id' ) ) ? (int) $product->get_parent_id() : 0;
+			$ids        = array_filter( array_unique( array( $product_id, $parent_id ) ) );
+
+			foreach ( $ids as $id ) {
+				$amount = (float) get_post_meta( $id, '_cbb_zencoin_grant_amount', true );
+
+				if ( $amount <= 0 ) {
+					$amount = (float) get_post_meta( $id, '_cbb_coin_grant_amount', true );
+				}
+
+				if ( $amount > 0 ) {
+					return $amount;
+				}
+			}
+
+			return 0.0;
+		}
+
+		/**
+		 * Normalize recovery Zencoin amounts.
+		 *
+		 * @param float $amount Amount.
+		 * @return float
+		 */
+		private static function normalize_recovery_amount( $amount ) {
+			return round( max( 0, (float) $amount ), 2 );
+		}
+
+		/**
+		 * Format recovery amount without unnecessary decimals.
+		 *
+		 * @param float $amount Amount.
+		 * @return string
+		 */
+		private static function format_recovery_amount_label( $amount ) {
+			$amount   = self::normalize_recovery_amount( $amount );
+			$decimals = abs( $amount - round( $amount ) ) < 0.01 ? 0 : 2;
+
+			return wc_format_decimal( $amount, $decimals );
+		}
+
+		/**
+		 * Apply custom member recovery price when the cart item is created.
+		 *
+		 * @param array $cart_item Cart item.
+		 * @return array
+		 */
+		public static function apply_member_recovery_cart_item_price( $cart_item ) {
+			return self::set_member_recovery_cart_item_price( $cart_item );
+		}
+
+		/**
+		 * Restore custom member recovery price from session.
+		 *
+		 * @param array  $cart_item      Cart item.
+		 * @param array  $values         Session values.
+		 * @param string $cart_item_key  Cart item key.
+		 * @return array
+		 */
+		public static function restore_member_recovery_cart_item_price( $cart_item, $values, $cart_item_key ) {
+			foreach ( array( 'zcf_member_recovery_product', 'zcf_member_recovery_price', 'zcf_member_recovery_zencoins', 'cbb_dynamic_zencoin_grant_amount', 'cbb_dynamic_zencoin_product_type', 'cbb_dynamic_zencoin_source_label' ) as $key ) {
+				if ( isset( $values[ $key ] ) ) {
+					$cart_item[ $key ] = $values[ $key ];
+				}
+			}
+
+			return self::set_member_recovery_cart_item_price( $cart_item );
+		}
+
+		/**
+		 * Re-apply custom member recovery prices before totals are calculated.
+		 *
+		 * @param WC_Cart $cart Cart.
+		 */
+		public static function apply_member_recovery_cart_prices( $cart ) {
+			if ( is_admin() && ! wp_doing_ajax() ) {
+				return;
+			}
+
+			if ( ! $cart || ! is_callable( array( $cart, 'get_cart' ) ) ) {
+				return;
+			}
+
+			foreach ( $cart->get_cart() as $cart_item ) {
+				self::set_member_recovery_cart_item_price( $cart_item );
+			}
+		}
+
+		/**
+		 * Set member recovery cart item price on the WC product object.
+		 *
+		 * @param array $cart_item Cart item.
+		 * @return array
+		 */
+		private static function set_member_recovery_cart_item_price( $cart_item ) {
+			if ( empty( $cart_item['zcf_member_recovery_product'] ) || empty( $cart_item['zcf_member_recovery_price'] ) ) {
+				return $cart_item;
+			}
+
+			if ( ! empty( $cart_item['data'] ) && is_object( $cart_item['data'] ) && is_callable( array( $cart_item['data'], 'set_price' ) ) ) {
+				$cart_item['data']->set_price( max( 0, (float) $cart_item['zcf_member_recovery_price'] ) );
+			}
+
+			return $cart_item;
 		}
 
 		/**
@@ -3272,18 +3652,53 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 				wp_send_json_error( array( 'message' => __( 'Your cart is unavailable.', 'zen-checkout-flow' ) ) );
 			}
 
-			$product_id   = isset( $_POST['product_id'] ) ? absint( wp_unslash( $_POST['product_id'] ) ) : 0; // phpcs:ignore WordPress.Security.NonceVerification.Missing
-			$variation_id = isset( $_POST['variation_id'] ) ? absint( wp_unslash( $_POST['variation_id'] ) ) : 0; // phpcs:ignore WordPress.Security.NonceVerification.Missing
-			$product      = wc_get_product( $variation_id ? $variation_id : $product_id );
+			$product_id         = isset( $_POST['product_id'] ) ? absint( wp_unslash( $_POST['product_id'] ) ) : 0; // phpcs:ignore WordPress.Security.NonceVerification.Missing
+			$variation_id       = isset( $_POST['variation_id'] ) ? absint( wp_unslash( $_POST['variation_id'] ) ) : 0; // phpcs:ignore WordPress.Security.NonceVerification.Missing
+			$is_member_recovery = ! empty( $_POST['member_recovery'] ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
+			$cart_item_data     = array(
+				'zcf_recovery_product' => true,
+			);
+
+			if ( $is_member_recovery ) {
+				$context = self::get_checkout_context();
+				$missing = isset( $context['missing_zencoins'] ) ? (float) $context['missing_zencoins'] : 0.0;
+				$offer   = self::get_member_recovery_offer( $missing, self::get_recovery_product_offers( $missing ) );
+
+				if ( empty( $offer ) ) {
+					wp_send_json_error( array( 'message' => __( 'The member Zencoin top-up is only available for active members with a valid membership rate.', 'zen-checkout-flow' ) ) );
+				}
+
+				$product_id     = absint( $offer['product_id'] );
+				$variation_id   = absint( $offer['variation_id'] );
+				$cart_item_data = array_merge(
+					$cart_item_data,
+					array(
+						'zcf_member_recovery_product'     => true,
+						'zcf_member_recovery_price'       => max( 0, (float) $offer['price_value'] ),
+						'zcf_member_recovery_zencoins'    => self::normalize_recovery_amount( $offer['zencoins'] ),
+						'cbb_dynamic_zencoin_grant_amount' => self::normalize_recovery_amount( $offer['zencoins'] ),
+						'cbb_dynamic_zencoin_product_type' => 'package',
+						'cbb_dynamic_zencoin_source_label' => __( 'Member Zencoin Top-up', 'zen-checkout-flow' ),
+					)
+				);
+			} else {
+				$product = wc_get_product( $variation_id ? $variation_id : $product_id );
+
+				if ( ! $product || ! $product->is_purchasable() ) {
+					wp_send_json_error( array( 'message' => __( 'This Zencoin plan is not available.', 'zen-checkout-flow' ) ) );
+				}
+
+				$offer = self::build_recovery_product_offer( $product );
+
+				if ( empty( $offer ) ) {
+					wp_send_json_error( array( 'message' => __( 'This product cannot be used for Zencoin recovery.', 'zen-checkout-flow' ) ) );
+				}
+			}
+
+			$product = wc_get_product( $variation_id ? $variation_id : $product_id );
 
 			if ( ! $product || ! $product->is_purchasable() ) {
 				wp_send_json_error( array( 'message' => __( 'This Zencoin plan is not available.', 'zen-checkout-flow' ) ) );
-			}
-
-			$offer = self::build_recovery_product_offer( $product );
-
-			if ( empty( $offer ) ) {
-				wp_send_json_error( array( 'message' => __( 'This product cannot be used for Zencoin recovery.', 'zen-checkout-flow' ) ) );
 			}
 
 			foreach ( WC()->cart->get_cart() as $cart_item_key => $cart_item ) {
@@ -3303,9 +3718,7 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 				1,
 				$variation_id,
 				$variation,
-				array(
-					'zcf_recovery_product' => true,
-				)
+				$cart_item_data
 			);
 
 			if ( ! $cart_item_key ) {
