@@ -1936,7 +1936,7 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 					<div class="zcf-plan-chooser__header">
 						<h3><?php esc_html_e( 'Please choose the plan', 'zen-checkout-flow' ); ?></h3>
 					</div>
-				<?php else : ?>
+				<?php elseif ( $best ) : ?>
 					<div class="zcf-shortage-prompt__card">
 						<h3><?php esc_html_e( 'Not enough Zencoins!', 'zen-checkout-flow' ); ?></h3>
 						<p>
@@ -1951,15 +1951,9 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 							?>
 						</p>
 						<div class="zcf-shortage-prompt__actions">
-							<?php if ( $best ) : ?>
-								<button type="button" class="zcf-result-button is-primary" data-zcf-add-recovery-product data-zcf-member-recovery="1" data-product-id="<?php echo esc_attr( $best['product_id'] ); ?>" data-variation-id="<?php echo esc_attr( $best['variation_id'] ); ?>">
-									<?php echo esc_html( sprintf( __( 'Buy %s', 'zen-checkout-flow' ), $best['zencoins_label'] ) ); ?>
-								</button>
-							<?php else : ?>
-								<a class="zcf-result-button is-primary" href="<?php echo esc_url( self::get_recovery_products_url() ); ?>">
-									<?php esc_html_e( 'Add Zencoins', 'zen-checkout-flow' ); ?>
-								</a>
-							<?php endif; ?>
+							<button type="button" class="zcf-result-button is-primary" data-zcf-add-recovery-product data-zcf-member-recovery="1" data-product-id="<?php echo esc_attr( $best['product_id'] ); ?>" data-variation-id="<?php echo esc_attr( $best['variation_id'] ); ?>">
+								<?php echo esc_html( sprintf( __( 'Buy %s', 'zen-checkout-flow' ), $best['zencoins_label'] ) ); ?>
+							</button>
 							<button type="button" class="zcf-result-button is-secondary" data-zcf-result-action="schedule">
 								<?php esc_html_e( 'Cancel', 'zen-checkout-flow' ); ?>
 							</button>
