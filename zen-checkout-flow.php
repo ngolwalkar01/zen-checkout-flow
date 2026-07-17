@@ -2324,7 +2324,11 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 				return array();
 			}
 
-			$container = self::get_member_recovery_container_offer( $offers );
+			$container = self::get_exact_member_recovery_offer( $offers, $missing );
+
+			if ( empty( $container ) ) {
+				$container = self::get_dynamic_member_recovery_offer_product();
+			}
 
 			if ( empty( $container ) ) {
 				return array();
@@ -2349,21 +2353,78 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 		}
 
 		/**
-		 * Pick a real purchasable product to carry a dynamic member top-up line.
+		 * Pick an exact package/drop-in product when one matches the missing ZC.
 		 *
-		 * @param array $offers Recovery offers.
+		 * @param array $offers  Recovery offers.
+		 * @param float $missing Missing ZC.
 		 * @return array
 		 */
-		private static function get_member_recovery_container_offer( $offers ) {
+		private static function get_exact_member_recovery_offer( $offers, $missing ) {
+			$missing = self::normalize_recovery_amount( $missing );
+
 			foreach ( (array) $offers as $offer ) {
 				$product_type = isset( $offer['product_type'] ) ? (string) $offer['product_type'] : '';
+				$zencoins     = isset( $offer['zencoins'] ) ? self::normalize_recovery_amount( $offer['zencoins'] ) : 0.0;
 
-				if ( in_array( $product_type, array( 'package', 'drop_in' ), true ) ) {
+				if ( ! in_array( $product_type, array( 'package', 'drop_in' ), true ) ) {
+					continue;
+				}
+
+				if ( abs( $zencoins - $missing ) < 0.01 ) {
 					return $offer;
 				}
 			}
 
 			return array();
+		}
+
+		/**
+		 * Build the configured dynamic recovery product container offer.
+		 *
+		 * @return array
+		 */
+		private static function get_dynamic_member_recovery_offer_product() {
+			$product_id = self::get_member_recovery_product_id();
+
+			if ( $product_id <= 0 ) {
+				return array();
+			}
+
+			$product = wc_get_product( $product_id );
+
+			if ( ! $product instanceof WC_Product || ! $product->is_purchasable() ) {
+				return array();
+			}
+
+			return array(
+				'product_id'       => $product->is_type( 'variation' ) ? $product->get_parent_id() : $product->get_id(),
+				'variation_id'     => $product->is_type( 'variation' ) ? $product->get_id() : 0,
+				'title'            => wp_strip_all_tags( $product->get_name() ),
+				'price_html'       => $product->get_price_html(),
+				'price_value'      => (float) wc_get_price_to_display( $product ),
+				'product_type'     => 'package',
+				'zencoins'         => 0,
+				'zencoins_label'   => '0',
+				'validity_label'   => __( 'Member rate', 'zen-checkout-flow' ),
+				'description_html' => '',
+			);
+		}
+
+		/**
+		 * Get the configured dynamic member recovery product ID.
+		 *
+		 * @return int
+		 */
+		private static function get_member_recovery_product_id() {
+			if ( function_exists( 'cbb_get_member_recovery_product_id' ) ) {
+				return absint( cbb_get_member_recovery_product_id() );
+			}
+
+			$settings   = get_option( 'cbb_zencoin_settings', array() );
+			$settings   = is_array( $settings ) ? $settings : array();
+			$product_id = isset( $settings['member_recovery_product_id'] ) ? absint( $settings['member_recovery_product_id'] ) : 0;
+
+			return absint( apply_filters( 'zcf_member_recovery_product_id', $product_id ) );
 		}
 
 		/**
