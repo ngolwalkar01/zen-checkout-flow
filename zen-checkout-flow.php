@@ -3574,8 +3574,16 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 				wp_send_json_error( array( 'message' => __( 'Your cart is unavailable.', 'zen-checkout-flow' ) ) );
 			}
 
-			WC()->cart->empty_cart();
+			WC()->cart->empty_cart( true );
 			WC()->cart->calculate_totals();
+
+			if ( WC()->session ) {
+				WC()->session->set( 'cart', array() );
+
+				if ( is_callable( array( WC()->session, 'save_data' ) ) ) {
+					WC()->session->save_data();
+				}
+			}
 
 			wp_send_json_success(
 				array(

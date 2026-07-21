@@ -20,10 +20,6 @@
 	}
 
 	function updateFragments($shell, data) {
-		if (!options.preserveCart) {
-			clearCartOnPopupClose();
-		}
-
 		parkPersistentCheckoutHost();
 
 		if (Object.prototype.hasOwnProperty.call(data, 'cartCount')) {
@@ -606,7 +602,7 @@
 				}
 
 				if (response && response.data && response.data.loggedOut && openLoginFlowOrFallback()) {
-					closePopup();
+					closePopup({ suppressRedirect: true, preserveCart: true });
 					return;
 				}
 
@@ -658,7 +654,7 @@
 				}
 
 				if (response && response.data && response.data.loggedOut && openLoginFlowOrFallback()) {
-					closePopup();
+					closePopup({ suppressRedirect: true, preserveCart: true });
 					return;
 				}
 
@@ -858,40 +854,97 @@
 	}
 
 	function shouldClearCartOnPopupClose() {
-		return !getPopupStage().find('.zcf-success-modal').length;
+		return !getPopupStage().find('.zcf-success-modal, .zcf-result-modal').length;
 	}
 
-	function clearCartOnPopupClose() {
+	function getClearCartPayload() {
+		return {
+			action: 'zcf_clear_cart_on_close',
+			nonce: zcfCheckout.nonce
+		};
+	}
+
+	function handleClearCartResponse(response) {
+		if (response && response.success && response.data && Object.prototype.hasOwnProperty.call(response.data, 'cartCount')) {
+			notifyCartCount(response.data.cartCount);
+		}
+	}
+
+	function clearCartOnPopupClose(options) {
+		var payload;
+		var body;
+		var fetchOptions;
+		var formData;
+
+		options = options || {};
+
 		if (!zcfCheckout.ajaxUrl || !zcfCheckout.nonce || !shouldClearCartOnPopupClose()) {
 			return;
+		}
+
+		payload = getClearCartPayload();
+
+		if (window.URLSearchParams && window.fetch) {
+			body = new window.URLSearchParams();
+			Object.keys(payload).forEach(function (key) {
+				body.append(key, payload[key]);
+			});
+
+			fetchOptions = {
+				method: 'POST',
+				credentials: 'same-origin',
+				headers: {
+					'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
+				},
+				body: body.toString()
+			};
+
+			if (options.keepalive) {
+				fetchOptions.keepalive = true;
+			}
+
+			window.fetch(zcfCheckout.ajaxUrl, fetchOptions)
+				.then(function (response) {
+					return response.json();
+				})
+				.then(handleClearCartResponse)
+				.catch(function () {});
+			return;
+		}
+
+		if (options.keepalive && window.navigator && typeof window.navigator.sendBeacon === 'function' && window.FormData) {
+			formData = new window.FormData();
+			Object.keys(payload).forEach(function (key) {
+				formData.append(key, payload[key]);
+			});
+
+			if (window.navigator.sendBeacon(zcfCheckout.ajaxUrl, formData)) {
+				return;
+			}
 		}
 
 		$.ajax({
 			type: 'POST',
 			url: zcfCheckout.ajaxUrl,
-			data: {
-				action: 'zcf_clear_cart_on_close',
-				nonce: zcfCheckout.nonce
-			}
-		}).done(function (response) {
-			if (response && response.success && response.data && Object.prototype.hasOwnProperty.call(response.data, 'cartCount')) {
-				notifyCartCount(response.data.cartCount);
-			}
-		});
+			data: payload
+		}).done(handleClearCartResponse);
 	}
 
 	function closePopup(options) {
+		var shouldRedirect;
+
 		options = options || {};
+		shouldRedirect = !options.suppressRedirect && shouldRedirectHomeOnClose();
 
 		if (!options.preserveCart) {
-			clearCartOnPopupClose();
+			clearCartOnPopupClose({ keepalive: shouldRedirect });
 		}
 
 		parkPersistentCheckoutHost();
 		getPopup().removeClass('is-active').attr('aria-hidden', 'true');
 		$('body').removeClass('zcf-popup-open');
 
-		if (!options.suppressRedirect && shouldRedirectHomeOnClose()) {
+		if (shouldRedirect) {
 			window.location.href = zcfCheckout.homeUrl;
 		}
 	}
