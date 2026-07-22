@@ -4,6 +4,9 @@
 	var currentStep = 'auto';
 	var stepHistory = [];
 	var popupHistoryArmed = false;
+	var authCartHandoffKey = 'zcf_auth_cart_handoff_pending';
+	var authModalObserver = null;
+	var authModalWasActive = false;
 
 	function setLoading($shell, isLoading) {
 		$shell.toggleClass('is-loading', !!isLoading);
@@ -543,8 +546,66 @@
 			.html(message || zcfCheckout.i18n.error);
 	}
 
+	function markAuthCartHandoffPending() {
+		try {
+			window.sessionStorage.setItem(authCartHandoffKey, '1');
+		} catch (error) {}
+	}
+
+	function clearAuthCartHandoffPending() {
+		try {
+			window.sessionStorage.removeItem(authCartHandoffKey);
+		} catch (error) {}
+	}
+
+	function consumeAuthCartHandoffPending() {
+		var isPending = false;
+
+		try {
+			isPending = window.sessionStorage.getItem(authCartHandoffKey) === '1';
+			window.sessionStorage.removeItem(authCartHandoffKey);
+		} catch (error) {
+			isPending = false;
+		}
+
+		return isPending;
+	}
+
+	function isAuthModalActive(modal) {
+		return !!modal && (modal.classList.contains('is-active') || modal.getAttribute('aria-hidden') === 'false');
+	}
+
+	function maybeClearCartAfterAuthModalClose(modal) {
+		var isActive = isAuthModalActive(modal);
+
+		if (authModalWasActive && !isActive && consumeAuthCartHandoffPending()) {
+			clearCartOnPopupClose();
+		}
+
+		authModalWasActive = isActive;
+	}
+
+	function installAuthModalCloseCartCleanup() {
+		var modal = document.getElementById('zenctuary-auth-modal');
+
+		if (!modal || authModalObserver || !window.MutationObserver) {
+			return;
+		}
+
+		authModalWasActive = isAuthModalActive(modal);
+		authModalObserver = new window.MutationObserver(function () {
+			maybeClearCartAfterAuthModalClose(modal);
+		});
+
+		authModalObserver.observe(modal, {
+			attributes: true,
+			attributeFilter: ['class', 'aria-hidden']
+		});
+	}
+
 	function openThemeLoginPopup() {
 		var checkoutReturnUrl;
+		var authModal = document.getElementById('zenctuary-auth-modal');
 
 		try {
 			checkoutReturnUrl = new URL(window.location.href);
@@ -554,14 +615,18 @@
 			// Ignore URL/storage issues and continue with the popup fallback.
 		}
 
-		if (window.zenctuaryAuth && typeof window.zenctuaryAuth.openModal === 'function') {
+		if (authModal && window.zenctuaryAuth && typeof window.zenctuaryAuth.openModal === 'function') {
+			installAuthModalCloseCartCleanup();
+			markAuthCartHandoffPending();
 			window.zenctuaryAuth.openModal('login');
 			return true;
 		}
 
 		var trigger = document.querySelector('[data-auth="login"]');
 
-		if (trigger) {
+		if (authModal && trigger) {
+			installAuthModalCloseCartCleanup();
+			markAuthCartHandoffPending();
 			trigger.click();
 			return true;
 		}
@@ -1190,6 +1255,11 @@
 	$(function () {
 		installPaymentDebugProbe();
 		restoreStepState();
+		installAuthModalCloseCartCleanup();
+
+		if (zcfCheckout.isLoggedIn) {
+			clearAuthCartHandoffPending();
+		}
 
 		if (zcfCheckout.autoOpen) {
 			openPopup();
