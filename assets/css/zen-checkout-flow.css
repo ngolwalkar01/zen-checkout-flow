@@ -1557,6 +1557,31 @@ body.zcf-popup-open {
 		gap: 24px;
 	}
 
+	.zcf-modal[data-zcf-step="choose_plan"] .zcf-grid,
+	.zcf-modal[data-zcf-step="shortage_prompt"] .zcf-grid {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	.zcf-modal[data-zcf-step="choose_plan"] .zcf-right--cart-step .zcf-cart-group,
+	.zcf-modal[data-zcf-step="shortage_prompt"] .zcf-right--cart-step .zcf-cart-group {
+		margin-top: 0;
+	}
+
+	.zcf-plan-tabs,
+	.zcf-recovery-card__head,
+	.zcf-recovery-card__subhead {
+		min-width: 0;
+	}
+
+	.zcf-plan-tabs {
+		width: 100%;
+	}
+
+	.zcf-recovery-card__head,
+	.zcf-recovery-card__subhead {
+		gap: 12px;
+	}
+
 	.zcf-success-panel {
 		max-width: none;
 	}
@@ -1579,21 +1604,14 @@ body.zcf-popup-open {
 
 	.zcf-recovery-offers {
 		max-height: none;
+		padding-right: 0;
+		overflow-x: hidden;
 	}
 
 	.zcf-recovery-card {
-		grid-template-columns: minmax(0, 1fr) 32px;
-	}
-
-	.zcf-recovery-card__side {
-		grid-column: 1 / -1;
-		grid-row: 2;
-		text-align: left;
-	}
-
-	.zcf-recovery-card__add {
-		grid-column: 2;
-		grid-row: 1;
+		width: 100%;
+		min-width: 0;
+		padding: 18px;
 	}
 
 	.zcf-customer {
