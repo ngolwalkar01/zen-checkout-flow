@@ -1223,10 +1223,6 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 					</div>
 				</div>
 
-				<button type="button" class="zcf-product-cta zcf-product-cta--remove" data-zcf-remove-cart-item="<?php echo esc_attr( $cart_item_key ); ?>">
-					<?php esc_html_e( 'Remove', 'zen-checkout-flow' ); ?>
-				</button>
-
 				<details class="zcf-more">
 					<summary><?php esc_html_e( 'more information', 'zen-checkout-flow' ); ?></summary>
 					<div class="zcf-more-body">
@@ -1282,10 +1278,6 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 						<div class="zcf-booking-card__instructor"><?php echo esc_html( $summary['instructor'] ); ?></div>
 					<?php endif; ?>
 				</div>
-
-				<button type="button" class="zcf-product-cta zcf-product-cta--remove" data-zcf-remove-cart-item="<?php echo esc_attr( $cart_item_key ); ?>">
-					<?php esc_html_e( 'Remove', 'zen-checkout-flow' ); ?>
-				</button>
 			</article>
 			<?php
 
