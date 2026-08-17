@@ -119,6 +119,7 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 					'cartUrl'     => self::dependencies_loaded() ? wc_get_cart_url() : '',
 					'homeUrl'     => home_url( '/' ),
 					'autoOpen'    => self::should_auto_open_popup(),
+					'requestedStep' => isset( $_GET['zcf_step'] ) ? sanitize_key( wp_unslash( $_GET['zcf_step'] ) ) : '', // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 					'popupOwnsRoute' => self::is_popup_owned_route(),
 					'myAccountUrl' => self::dependencies_loaded() ? wc_get_page_permalink( 'myaccount' ) : '',
 					'isLoggedIn'   => is_user_logged_in(),
@@ -1799,7 +1800,7 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			<?php if ( self::should_render_debug() ) : ?>
 				<?php echo self::render_checkout_context_debug(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 			<?php endif; ?>
-			<?php if ( $is_cart_step && 'insufficient_prompt' === $mode ) : ?>
+			<?php if ( $is_cart_step ) : ?>
 				<?php echo self::render_insufficient_zencoin_prompt( $context, $step ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 				<?php
 				return ob_get_clean();

@@ -777,8 +777,9 @@
 		return getPopup().find('[data-zcf-popup-stage]');
 	}
 
-	function ensureCheckoutRuntimeOrRedirect() {
+	function ensureCheckoutRuntimeOrRedirect(requestedStep) {
 		var url;
+		var targetStep = requestedStep || '';
 
 		if (zcfCheckout.checkoutRuntimeReady || getPersistentCheckoutHost().length) {
 			return true;
@@ -787,6 +788,12 @@
 		try {
 			url = new URL(window.location.href);
 			url.searchParams.set('zcf_open_checkout', '1');
+			if (!targetStep) {
+				targetStep = url.searchParams.get('zcf_step') || '';
+			}
+			if (targetStep && targetStep !== '1' && targetStep !== 'true') {
+				url.searchParams.set('zcf_step', targetStep);
+			}
 			window.location.href = url.toString();
 		} catch (error) {
 			window.location.href = zcfCheckout.cartUrl || window.location.href;
@@ -844,7 +851,7 @@
 			return;
 		}
 
-		if (!ensureCheckoutRuntimeOrRedirect()) {
+		if (!ensureCheckoutRuntimeOrRedirect(stepParam)) {
 			return;
 		}
 
@@ -1269,7 +1276,7 @@
 		}
 
 		if (zcfCheckout.autoOpen) {
-			openPopup();
+			openPopup(zcfCheckout.requestedStep || '');
 		}
 	});
 
