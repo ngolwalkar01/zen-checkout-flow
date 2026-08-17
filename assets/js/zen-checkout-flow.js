@@ -824,10 +824,17 @@
 		});
 	}
 
-	function openPopup() {
+	function openPopup(requestedStep) {
 		var $popup = getPopup();
 		var $stage = getPopupStage();
 		var hasShell;
+		var stepParam = (requestedStep && requestedStep !== '1' && requestedStep !== 'true') ? requestedStep : '';
+
+		if (!stepParam) {
+			try {
+				stepParam = new URL(window.location.href).searchParams.get('zcf_step') || '';
+			} catch (error) {}
+		}
 
 		if (!$popup.length || !$stage.length) {
 			return;
@@ -846,17 +853,16 @@
 		armPopupHistory();
 		hasShell = $stage.find('[data-zcf-checkout-flow]').length > 0;
 
-		if (!hasShell) {
+		if (!hasShell || stepParam) {
 			$stage.html('<div class="zcf-popup-loading" data-zcf-popup-loading>' + zcfCheckout.i18n.loading + '</div>');
 			stepHistory = [];
-			renderPopupShell($stage);
+			renderPopupShell($stage, false, stepParam || 'auto');
 			return;
 		}
 
 		currentStep = getShellStep($stage) || currentStep;
 		syncBackButtonState($stage);
 		attachPersistentCheckoutHost($stage);
-
 	}
 
 	function reloadPopupToPayment(previousStep) {
@@ -1228,7 +1234,8 @@
 			return;
 		}
 
-		openPopup();
+		var requestedStep = $(this).attr('data-zcf-open-checkout') || $(this).attr('data-zcf-step') || '';
+		openPopup(requestedStep);
 	});
 
 	$(document).on('click', 'a[href]', function (event) {

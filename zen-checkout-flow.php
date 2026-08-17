@@ -52,6 +52,7 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			add_filter( 'woocommerce_add_cart_item', array( __CLASS__, 'apply_member_recovery_cart_item_price' ), 1000, 1 );
 			add_filter( 'woocommerce_get_cart_item_from_session', array( __CLASS__, 'restore_member_recovery_cart_item_price' ), 1000, 3 );
 			add_action( 'woocommerce_before_calculate_totals', array( __CLASS__, 'apply_member_recovery_cart_prices' ), 1000 );
+			add_filter( 'cbb_zencoin_wallet_topup_url', array( __CLASS__, 'filter_zencoin_wallet_topup_url' ) );
 
 			if ( is_admin() ) {
 				add_action( 'admin_notices', array( __CLASS__, 'maybe_dependency_notice' ) );
@@ -233,6 +234,17 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			$redirect_url = wp_validate_redirect( wp_get_referer(), home_url( '/' ) );
 
 			return add_query_arg( 'zcf_open_checkout', '1', remove_query_arg( array( 'add-to-cart', 'zcf_open_checkout' ), $redirect_url ) );
+		}
+
+		/**
+		 * Filter the CBB Zencoin wallet Top-Up button URL to open the plan chooser step.
+		 *
+		 * @param string $url Current topup URL.
+		 * @return string
+		 */
+		public static function filter_zencoin_wallet_topup_url( $url = '' ) {
+			$target = function_exists( 'wc_get_account_endpoint_url' ) ? wc_get_account_endpoint_url( 'wallet' ) : home_url( '/my-account/wallet/' );
+			return add_query_arg( array( 'zcf_open_checkout' => '1', 'zcf_step' => 'choose_plan' ), $target );
 		}
 
 		/**
@@ -463,13 +475,14 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 				);
 			}
 
-			if ( ! WC()->cart || WC()->cart->is_empty() ) {
-				return self::render_empty_cart();
-			}
-
 			$context             = self::get_checkout_context();
 			$mode                = isset( $context['mode'] ) ? $context['mode'] : 'money_purchase';
 			$step                = self::resolve_frame_step( $context, $step );
+
+			if ( ( ! WC()->cart || WC()->cart->is_empty() ) && ! in_array( $step, array( 'choose_plan', 'shortage_prompt' ), true ) ) {
+				return self::render_empty_cart();
+			}
+
 			$show_checkout_intro = 'payment' === $step;
 			$is_cart_step        = in_array( $step, array( 'choose_plan', 'shortage_prompt' ), true );
 			$show_back           = 'payment' === $step && ! empty( $context['has_booking_items'] ) && ( 'mixed_recovery' === $mode || ! empty( $context['has_recovery_products'] ) );
