@@ -3101,11 +3101,15 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 		 * @return string
 		 */
 		private static function get_ajax_step() {
-			if ( empty( $_POST['zcf_step'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Missing
-				return 'auto';
+			$step = '';
+
+			if ( ! empty( $_POST['zcf_step'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Missing
+				$step = sanitize_key( wp_unslash( $_POST['zcf_step'] ) );
+			} elseif ( ! empty( $_GET['zcf_step'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+				$step = sanitize_key( wp_unslash( $_GET['zcf_step'] ) );
 			}
 
-			return self::normalize_step( sanitize_key( wp_unslash( $_POST['zcf_step'] ) ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
+			return self::normalize_step( $step ? $step : 'auto' );
 		}
 
 		/**
@@ -3127,11 +3131,16 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 		 */
 		private static function resolve_frame_step( $context, $step ) {
 			$step = self::normalize_step( $step );
-			$mode = isset( $context['mode'] ) ? $context['mode'] : 'money_purchase';
 
 			if ( in_array( $step, array( 'choose_plan', 'shortage_prompt' ), true ) ) {
 				return $step;
 			}
+
+			if ( isset( $_REQUEST['zcf_step'] ) && in_array( $_REQUEST['zcf_step'], array( 'choose_plan', 'shortage_prompt' ), true ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+				return sanitize_key( wp_unslash( $_REQUEST['zcf_step'] ) );
+			}
+
+			$mode = isset( $context['mode'] ) ? $context['mode'] : 'money_purchase';
 
 			if ( in_array( $mode, array( 'money_purchase', 'mixed_recovery', 'zencoin_booking' ), true ) ) {
 				return 'payment';

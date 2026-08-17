@@ -839,8 +839,10 @@
 
 		if (!stepParam) {
 			try {
-				stepParam = new URL(window.location.href).searchParams.get('zcf_step') || '';
-			} catch (error) {}
+				stepParam = new URL(window.location.href).searchParams.get('zcf_step') || (zcfCheckout && zcfCheckout.requestedStep) || '';
+			} catch (error) {
+				stepParam = (zcfCheckout && zcfCheckout.requestedStep) || '';
+			}
 		}
 
 		if (!$popup.length || !$stage.length) {
@@ -1235,6 +1237,7 @@
 
 	$(document).on('click', '[data-zcf-popup-close], [data-zcf-open-checkout]', function (event) {
 		event.preventDefault();
+		event.stopImmediatePropagation();
 
 		if ($(this).is('[data-zcf-popup-close]')) {
 			closePopup();
@@ -1242,16 +1245,35 @@
 		}
 
 		var requestedStep = $(this).attr('data-zcf-open-checkout') || $(this).attr('data-zcf-step') || '';
-		openPopup(requestedStep);
+		if (!requestedStep) {
+			try {
+				var href = $(this).attr('href') || '';
+				requestedStep = new URL(href, window.location.href).searchParams.get('zcf_step') || '';
+			} catch (e) {}
+		}
+
+		openPopup(requestedStep || 'choose_plan');
 	});
 
 	$(document).on('click', 'a[href]', function (event) {
+		if ($(this).is('[data-zcf-open-checkout]')) {
+			return;
+		}
+
 		if (!isCartOrCheckoutUrl(this.href)) {
 			return;
 		}
 
 		event.preventDefault();
-		openPopup();
+
+		var requestedStep = $(this).attr('data-zcf-open-checkout') || $(this).attr('data-zcf-step') || '';
+		if (!requestedStep) {
+			try {
+				requestedStep = new URL(this.href, window.location.href).searchParams.get('zcf_step') || '';
+			} catch (e) {}
+		}
+
+		openPopup(requestedStep);
 	});
 
 	$(document.body).on('added_to_cart', function () {
