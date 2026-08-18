@@ -1054,7 +1054,7 @@
 			}
 		})
 			.done(function (response) {
-				if (response && response.success) {
+				if (response && response.success && response.data) {
 					stepHistory.push(previousStep || 'choose_plan');
 					try {
 						var url = new URL(window.location.href);
@@ -1062,7 +1062,7 @@
 						url.searchParams.set('zcf_open_checkout', '1');
 						window.history.replaceState({}, '', url.toString());
 					} catch (e) {}
-					renderPopupShell($stage, false, 'payment');
+					updateFragments($shell, response.data);
 					return;
 				}
 
