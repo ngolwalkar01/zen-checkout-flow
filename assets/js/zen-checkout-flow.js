@@ -1063,6 +1063,15 @@
 						window.history.replaceState({}, '', url.toString());
 					} catch (e) {}
 					updateFragments($shell, response.data);
+
+					if (window.wp && window.wp.data && typeof window.wp.data.dispatch === 'function') {
+						try {
+							var cartDispatch = window.wp.data.dispatch('wc/store/cart');
+							if (cartDispatch && typeof cartDispatch.fetchCart === 'function') {
+								cartDispatch.fetchCart();
+							}
+						} catch (e) {}
+					}
 					return;
 				}
 
