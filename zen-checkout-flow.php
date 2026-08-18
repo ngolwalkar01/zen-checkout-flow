@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Zen Checkout Flow
  * Description: Popup-based WooCommerce checkout/cart flow for logged-in customers.
- * Version: 0.1.76
+ * Version: 0.1.77
  * Author: Custom
  * Text Domain: zen-checkout-flow
  *
@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
 if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 	final class ZCF_Zen_Checkout_Flow {
 
-		const VERSION = '0.1.76';
+		const VERSION = '0.1.77';
 		const NONCE_ACTION = 'zcf_checkout_flow';
 		private static $native_card_bootstrap_summary = null;
 
@@ -3812,7 +3812,7 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			$context = self::get_checkout_context();
 			$mode    = isset( $context['mode'] ) ? (string) $context['mode'] : 'money_purchase';
 
-			if ( 'mixed_recovery' !== $mode ) {
+			if ( ! empty( $context['has_booking_items'] ) && 'mixed_recovery' !== $mode ) {
 				WC()->cart->remove_cart_item( $cart_item_key );
 				WC()->cart->calculate_totals();
 
