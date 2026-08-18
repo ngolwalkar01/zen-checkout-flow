@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Zen Checkout Flow
  * Description: Popup-based WooCommerce checkout/cart flow for logged-in customers.
- * Version: 0.1.80
+ * Version: 0.1.82
  * Author: Custom
  * Text Domain: zen-checkout-flow
  *
@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
 if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 	final class ZCF_Zen_Checkout_Flow {
 
-		const VERSION = '0.1.80';
+		const VERSION = '0.1.82';
 		const NONCE_ACTION = 'zcf_checkout_flow';
 		private static $native_card_bootstrap_summary = null;
 
@@ -280,9 +280,7 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 				return false;
 			}
 
-			return self::should_auto_open_popup()
-				|| self::is_popup_owned_route()
-				|| self::current_page_has_checkout_shortcode();
+			return is_user_logged_in();
 		}
 
 		/**
