@@ -89,6 +89,42 @@
 		$stash.append($host);
 	}
 
+	function refreshWcStoreCart() {
+		if (window.wp && window.wp.data && typeof window.wp.data.dispatch === 'function') {
+			try {
+				var cartDispatch = window.wp.data.dispatch('wc/store/cart');
+				if (cartDispatch && typeof cartDispatch.fetchCart === 'function') {
+					cartDispatch.fetchCart().then(function (cartData) {
+						logPaymentDebug('store:cart-fetched', { cartData: cartData });
+						window.setTimeout(function () {
+							try {
+								window.dispatchEvent(new Event('resize'));
+								$(document.body).trigger('updated_checkout');
+							} catch (e) {}
+						}, 50);
+					}).catch(function (err) {
+						logPaymentDebug('store:cart-fetch-error', { error: err });
+					});
+				}
+
+				if (typeof window.wp.data.invalidateResolution === 'function') {
+					try {
+						window.wp.data.invalidateResolution('wc/store/cart', 'getCartData', []);
+					} catch (e) {}
+				}
+			} catch (error) {
+				logPaymentDebug('refreshWcStoreCart error', { error: error });
+			}
+		}
+
+		try {
+			window.dispatchEvent(new Event('resize'));
+			$(document.body).trigger('update_checkout');
+			$(document.body).trigger('updated_checkout');
+			$(document.body).trigger('wc_fragment_refresh');
+		} catch (e) {}
+	}
+
 	function attachPersistentCheckoutHost($shell) {
 		var $host = getPersistentCheckoutHost();
 		var $slot = $shell.find('[data-zcf-block-checkout-slot]').first();
@@ -99,6 +135,11 @@
 
 		$slot.empty().append($host);
 		clearStaleCoinBalanceNotices($shell);
+		refreshWcStoreCart();
+
+		window.setTimeout(function () {
+			refreshWcStoreCart();
+		}, 250);
 	}
 
 	function isDebugEnabled() {
@@ -1063,15 +1104,7 @@
 						window.history.replaceState({}, '', url.toString());
 					} catch (e) {}
 					updateFragments($shell, response.data);
-
-					if (window.wp && window.wp.data && typeof window.wp.data.dispatch === 'function') {
-						try {
-							var cartDispatch = window.wp.data.dispatch('wc/store/cart');
-							if (cartDispatch && typeof cartDispatch.fetchCart === 'function') {
-								cartDispatch.fetchCart();
-							}
-						} catch (e) {}
-					}
+					refreshWcStoreCart();
 					return;
 				}
 
