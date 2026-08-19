@@ -104,22 +104,25 @@
 	}
 
 	function pollPaymentHostReady(attemptsLeft) {
-		attemptsLeft = typeof attemptsLeft === 'number' ? attemptsLeft : 30;
+		attemptsLeft = typeof attemptsLeft === 'number' ? attemptsLeft : 40;
 		var $host = getPersistentCheckoutHost();
 
 		if (!$host.length) {
 			return;
 		}
 
-		var hasPaymentInputs = $host.find('input[name="radio-control-wc-payment-method-options"], input[name="payment-method"], .wc-block-components-payment-method-options, .wc-block-components-payment-method-label').length > 0;
+		var hasPaymentInputs = $host.find('input[name="radio-control-wc-payment-method-options"], input[name="payment-method"], .wc-block-components-payment-method-options, .wc-block-components-payment-method-label, .wc-block-components-payment-method-options__option').length > 0;
 
 		if (hasPaymentInputs || attemptsLeft <= 0) {
 			setPaymentHostFetching(false);
 			clearStaleCoinBalanceNotices(getPopupStage());
+			try {
+				window.dispatchEvent(new Event('resize'));
+			} catch (e) {}
 		} else {
 			window.setTimeout(function () {
 				pollPaymentHostReady(attemptsLeft - 1);
-			}, 100);
+			}, 80);
 		}
 	}
 
