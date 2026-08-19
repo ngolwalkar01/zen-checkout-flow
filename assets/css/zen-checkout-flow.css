@@ -668,33 +668,35 @@ body.zcf-popup-open {
 
 .zcf-block-checkout-host.is-fetching-payments > * {
 	display: none !important;
+	opacity: 0 !important;
+	visibility: hidden !important;
 }
 
 .zcf-block-checkout-host.is-fetching-payments {
 	display: flex !important;
-	flex-direction: column;
-	align-items: center;
-	justify-content: center;
-	gap: 14px;
-	min-height: 220px;
+	flex-direction: column !important;
+	align-items: center !important;
+	justify-content: center !important;
+	gap: 14px !important;
+	min-height: 240px !important;
 }
 
 .zcf-block-checkout-host.is-fetching-payments::before {
-	content: "";
-	width: 36px;
-	height: 36px;
-	border: 3px solid rgba(226, 190, 82, 0.25);
-	border-top-color: var(--zcf-gold);
-	border-radius: 50%;
-	animation: zcfSpinner 0.8s linear infinite;
+	content: "" !important;
+	width: 38px !important;
+	height: 38px !important;
+	border: 3px solid rgba(226, 190, 82, 0.25) !important;
+	border-top-color: var(--zcf-gold) !important;
+	border-radius: 50% !important;
+	animation: zcfSpinner 0.8s linear infinite !important;
 }
 
 .zcf-block-checkout-host.is-fetching-payments::after {
-	content: "Loading payment options…";
-	color: var(--zcf-gold);
-	font-size: 14px;
-	font-weight: 600;
-	letter-spacing: 0.02em;
+	content: "Loading payment options…" !important;
+	color: var(--zcf-gold) !important;
+	font-size: 14px !important;
+	font-weight: 600 !important;
+	letter-spacing: 0.02em !important;
 }
 
 @keyframes zcfSpinner {
@@ -706,7 +708,13 @@ body.zcf-popup-open {
 .zcf-block-checkout-host .wc-block-components-empty-cart,
 .zcf-block-checkout-host .wc-block-checkout__empty-cart,
 .zcf-block-checkout-host .wp-block-woocommerce-checkout-empty-cart-block,
-.zcf-block-checkout-host .wc-block-components-notice-banner {
+.zcf-block-checkout-host .wc-block-components-cart-checkout-error,
+.zcf-block-checkout-host .wc-block-cart-empty,
+.zcf-block-checkout-host [class*="empty-cart"],
+.zcf-block-checkout-host [class*="emptyCart"],
+.zcf-block-checkout-host .wc-block-components-notice-banner,
+.zcf-block-checkout-host .woocommerce-error,
+.zcf-block-checkout-host [role="alert"] {
 	display: none !important;
 }
 

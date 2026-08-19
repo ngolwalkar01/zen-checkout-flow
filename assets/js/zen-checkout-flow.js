@@ -612,8 +612,13 @@
 	function clearStaleCoinBalanceNotices($scope) {
 		var patterns = [
 			/current balance is/i,
-			/you need \d+(?:[.,]\d+)? coins for these bookings/i
+			/you need \d+(?:[.,]\d+)? coins for these bookings/i,
+			/cart is currently empty/i,
+			/checkout is not available whilst your cart is empty/i,
+			/no payment method available/i
 		];
+
+		$scope.find('.wc-block-components-empty-cart, .wc-block-checkout__empty-cart, .wp-block-woocommerce-checkout-empty-cart-block, [class*="empty-cart"]').remove();
 
 		$scope.find('.wc-block-components-notice-banner, .woocommerce-error, [role="alert"]').each(function () {
 			var $notice = $(this);
