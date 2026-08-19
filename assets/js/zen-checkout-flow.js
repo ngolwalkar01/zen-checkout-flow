@@ -90,31 +90,55 @@
 	}
 
 	function refreshWcStoreCart() {
-		if (window.wp && window.wp.data && typeof window.wp.data.dispatch === 'function') {
+		var cacheBuster = '?nocache=' + Date.now();
+
+		if (window.wp && window.wp.apiFetch) {
 			try {
-				var cartDispatch = window.wp.data.dispatch('wc/store/cart');
-				if (cartDispatch && typeof cartDispatch.fetchCart === 'function') {
-					cartDispatch.fetchCart().then(function (cartData) {
-						logPaymentDebug('store:cart-fetched', { cartData: cartData });
+				window.wp.apiFetch({ path: '/wc/store/v1/cart' + cacheBuster })
+					.then(function (liveCart) {
+						logPaymentDebug('store:live-cart-fetched', { liveCart: liveCart });
+
+						if (window.wp && window.wp.data && typeof window.wp.data.dispatch === 'function') {
+							var cartDispatch = window.wp.data.dispatch('wc/store/cart');
+							if (cartDispatch && typeof cartDispatch.receiveCart === 'function') {
+								cartDispatch.receiveCart(liveCart);
+							} else if (cartDispatch && typeof cartDispatch.fetchCart === 'function') {
+								cartDispatch.fetchCart();
+							}
+
+							if (typeof window.wp.data.invalidateResolution === 'function') {
+								try {
+									window.wp.data.invalidateResolution('wc/store/cart', 'getCartData', []);
+								} catch (e) {}
+							}
+						}
+
 						window.setTimeout(function () {
 							try {
 								window.dispatchEvent(new Event('resize'));
 								$(document.body).trigger('updated_checkout');
 							} catch (e) {}
 						}, 50);
-					}).catch(function (err) {
-						logPaymentDebug('store:cart-fetch-error', { error: err });
+					})
+					.catch(function (err) {
+						logPaymentDebug('store:live-cart-fetch-error', { error: err });
+						if (window.wp && window.wp.data && typeof window.wp.data.dispatch === 'function') {
+							var fallbackDispatch = window.wp.data.dispatch('wc/store/cart');
+							if (fallbackDispatch && typeof fallbackDispatch.fetchCart === 'function') {
+								fallbackDispatch.fetchCart();
+							}
+						}
 					});
-				}
-
-				if (typeof window.wp.data.invalidateResolution === 'function') {
-					try {
-						window.wp.data.invalidateResolution('wc/store/cart', 'getCartData', []);
-					} catch (e) {}
-				}
 			} catch (error) {
-				logPaymentDebug('refreshWcStoreCart error', { error: error });
+				logPaymentDebug('refreshWcStoreCart apiFetch error', { error: error });
 			}
+		} else if (window.wp && window.wp.data && typeof window.wp.data.dispatch === 'function') {
+			try {
+				var cartDispatch = window.wp.data.dispatch('wc/store/cart');
+				if (cartDispatch && typeof cartDispatch.fetchCart === 'function') {
+					cartDispatch.fetchCart();
+				}
+			} catch (e) {}
 		}
 
 		try {
