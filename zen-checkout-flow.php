@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Zen Checkout Flow
  * Description: Popup-based WooCommerce checkout/cart flow for logged-in customers.
- * Version: 0.1.86
+ * Version: 0.1.87
  * Author: Custom
  * Text Domain: zen-checkout-flow
  *
@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
 if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 	final class ZCF_Zen_Checkout_Flow {
 
-		const VERSION = '0.1.86';
+		const VERSION = '0.1.87';
 		const NONCE_ACTION = 'zcf_checkout_flow';
 		private static $native_card_bootstrap_summary = null;
 
@@ -85,7 +85,8 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 		 * Register and enqueue frontend assets.
 		 */
 		public static function register_assets() {
-			$base_url = plugin_dir_url( __FILE__ );
+			$base_url               = plugin_dir_url( __FILE__ );
+			$base_dir               = plugin_dir_path( __FILE__ );
 			$needs_checkout_runtime = self::should_enqueue_checkout_runtime_assets();
 			$native_card_bootstrap  = array();
 
@@ -94,18 +95,26 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 				$native_card_bootstrap = self::prepare_native_card_runtime_assets();
 			}
 
+			$css_ver = file_exists( $base_dir . 'assets/css/zen-checkout-flow.css' )
+				? filemtime( $base_dir . 'assets/css/zen-checkout-flow.css' )
+				: self::VERSION;
+
+			$js_ver = file_exists( $base_dir . 'assets/js/zen-checkout-flow.js' )
+				? filemtime( $base_dir . 'assets/js/zen-checkout-flow.js' )
+				: self::VERSION;
+
 			wp_register_style(
 				'zcf-checkout-flow',
 				$base_url . 'assets/css/zen-checkout-flow.css',
 				array(),
-				self::VERSION
+				$css_ver
 			);
 
 			wp_register_script(
 				'zcf-checkout-flow',
 				$base_url . 'assets/js/zen-checkout-flow.js',
 				array( 'jquery' ),
-				self::VERSION,
+				$js_ver,
 				true
 			);
 
