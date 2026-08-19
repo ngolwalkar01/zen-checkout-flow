@@ -89,6 +89,40 @@
 		$stash.append($host);
 	}
 
+	function setPaymentHostFetching(isFetching) {
+		var $host = getPersistentCheckoutHost();
+
+		if (!$host.length) {
+			return;
+		}
+
+		if (isFetching) {
+			$host.addClass('is-fetching-payments');
+		} else {
+			$host.removeClass('is-fetching-payments');
+		}
+	}
+
+	function pollPaymentHostReady(attemptsLeft) {
+		attemptsLeft = typeof attemptsLeft === 'number' ? attemptsLeft : 30;
+		var $host = getPersistentCheckoutHost();
+
+		if (!$host.length) {
+			return;
+		}
+
+		var hasPaymentInputs = $host.find('input[name="radio-control-wc-payment-method-options"], input[name="payment-method"], .wc-block-components-payment-method-options, .wc-block-components-payment-method-label').length > 0;
+
+		if (hasPaymentInputs || attemptsLeft <= 0) {
+			setPaymentHostFetching(false);
+			clearStaleCoinBalanceNotices(getPopupStage());
+		} else {
+			window.setTimeout(function () {
+				pollPaymentHostReady(attemptsLeft - 1);
+			}, 100);
+		}
+	}
+
 	function refreshWcStoreCart() {
 		var cacheBuster = '?nocache=' + Date.now();
 
@@ -113,6 +147,8 @@
 							}
 						}
 
+						pollPaymentHostReady(30);
+
 						window.setTimeout(function () {
 							try {
 								window.dispatchEvent(new Event('resize'));
@@ -122,23 +158,14 @@
 					})
 					.catch(function (err) {
 						logPaymentDebug('store:live-cart-fetch-error', { error: err });
-						if (window.wp && window.wp.data && typeof window.wp.data.dispatch === 'function') {
-							var fallbackDispatch = window.wp.data.dispatch('wc/store/cart');
-							if (fallbackDispatch && typeof fallbackDispatch.fetchCart === 'function') {
-								fallbackDispatch.fetchCart();
-							}
-						}
+						pollPaymentHostReady(5);
 					});
 			} catch (error) {
 				logPaymentDebug('refreshWcStoreCart apiFetch error', { error: error });
+				pollPaymentHostReady(5);
 			}
-		} else if (window.wp && window.wp.data && typeof window.wp.data.dispatch === 'function') {
-			try {
-				var cartDispatch = window.wp.data.dispatch('wc/store/cart');
-				if (cartDispatch && typeof cartDispatch.fetchCart === 'function') {
-					cartDispatch.fetchCart();
-				}
-			} catch (e) {}
+		} else {
+			pollPaymentHostReady(15);
 		}
 
 		try {
@@ -159,6 +186,7 @@
 
 		$slot.empty().append($host);
 		clearStaleCoinBalanceNotices($shell);
+		setPaymentHostFetching(true);
 		refreshWcStoreCart();
 
 		window.setTimeout(function () {

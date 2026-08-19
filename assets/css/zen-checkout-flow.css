@@ -658,10 +658,43 @@ body.zcf-popup-open {
 }
 
 .zcf-block-checkout-host {
+	position: relative;
 	border: 1px solid rgba(232, 232, 226, 0.2);
 	border-radius: 12px;
 	background: rgba(255, 255, 255, 0.04);
 	padding: 14px;
+	min-height: 200px;
+}
+
+.zcf-block-checkout-host.is-fetching-payments::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	z-index: 10;
+	background: rgba(38, 39, 34, 0.96);
+	border-radius: 12px;
+	backdrop-filter: blur(8px);
+	-webkit-backdrop-filter: blur(8px);
+}
+
+.zcf-block-checkout-host.is-fetching-payments::after {
+	content: "Loading payment options…";
+	position: absolute;
+	left: 50%;
+	top: 50%;
+	z-index: 11;
+	transform: translate(-50%, -50%);
+	color: var(--zcf-gold);
+	font-size: 14px;
+	font-weight: 600;
+	letter-spacing: 0.02em;
+	pointer-events: none;
+}
+
+.zcf-block-checkout-host .wc-block-components-empty-cart,
+.zcf-block-checkout-host .wc-block-checkout__empty-cart,
+.zcf-block-checkout-host .wp-block-woocommerce-checkout-empty-cart-block {
+	display: none !important;
 }
 
 .zcf-block-checkout-host__slot {
