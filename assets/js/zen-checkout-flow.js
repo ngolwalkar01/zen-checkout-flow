@@ -4,6 +4,7 @@
 	var currentStep = 'auto';
 	var stepHistory = [];
 	var popupHistoryArmed = false;
+	var topupModeActive = false;
 	var authCartHandoffKey = 'zcf_auth_cart_handoff_pending';
 	var authModalObserver = null;
 	var authModalWasActive = false;
@@ -603,13 +604,15 @@
 		});
 	}
 
-	function openThemeLoginPopup() {
+	function openThemeLoginPopup(options) {
 		var checkoutReturnUrl;
 		var authModal = document.getElementById('zenctuary-auth-modal');
 
+		options = options || {};
+
 		try {
 			checkoutReturnUrl = new URL(window.location.href);
-			checkoutReturnUrl.searchParams.set('zcf_open_checkout', '1');
+			checkoutReturnUrl.searchParams.set('zcf_open_checkout', options.topup ? 'topup' : '1');
 			window.sessionStorage.setItem('zenctuary_post_auth_redirect', checkoutReturnUrl.toString());
 		} catch (error) {
 			// Ignore URL/storage issues and continue with the popup fallback.
@@ -638,8 +641,8 @@
 		return !zcfCheckout.isLoggedIn;
 	}
 
-	function openLoginFlowOrFallback() {
-		if (shouldUseThemeLogin() && openThemeLoginPopup()) {
+	function openLoginFlowOrFallback(options) {
+		if (shouldUseThemeLogin() && openThemeLoginPopup(options)) {
 			return true;
 		}
 
@@ -777,8 +780,10 @@
 		return getPopup().find('[data-zcf-popup-stage]');
 	}
 
-	function ensureCheckoutRuntimeOrRedirect() {
+	function ensureCheckoutRuntimeOrRedirect(options) {
 		var url;
+
+		options = options || {};
 
 		if (zcfCheckout.checkoutRuntimeReady || getPersistentCheckoutHost().length) {
 			return true;
@@ -786,7 +791,7 @@
 
 		try {
 			url = new URL(window.location.href);
-			url.searchParams.set('zcf_open_checkout', '1');
+			url.searchParams.set('zcf_open_checkout', options.topup ? 'topup' : '1');
 			window.location.href = url.toString();
 		} catch (error) {
 			window.location.href = zcfCheckout.cartUrl || window.location.href;
@@ -795,7 +800,9 @@
 		return false;
 	}
 
-	function renderPopupShell($stage, skipResult, step) {
+	function renderPopupShell($stage, skipResult, step, options) {
+		options = options || {};
+
 		return $.ajax({
 			type: 'POST',
 			url: zcfCheckout.ajaxUrl,
@@ -803,7 +810,8 @@
 				action: 'zcf_render_checkout',
 				nonce: zcfCheckout.nonce,
 				current_url: skipResult ? '' : window.location.href,
-				zcf_step: step || 'auto'
+				zcf_step: step || 'auto',
+				zcf_topup: options.topup ? 1 : 0
 			}
 		}).done(function (response) {
 			if (response && response.success && response.data && response.data.html) {
@@ -824,20 +832,25 @@
 		});
 	}
 
-	function openPopup() {
+	function openPopup(options) {
 		var $popup = getPopup();
 		var $stage = getPopupStage();
 		var hasShell;
+		var isTopup;
+
+		options = options || {};
+		isTopup = !!options.topup;
+		topupModeActive = isTopup;
 
 		if (!$popup.length || !$stage.length) {
 			return;
 		}
 
-		if (openLoginFlowOrFallback()) {
+		if (openLoginFlowOrFallback({ topup: isTopup })) {
 			return;
 		}
 
-		if (!ensureCheckoutRuntimeOrRedirect()) {
+		if (!ensureCheckoutRuntimeOrRedirect({ topup: isTopup })) {
 			return;
 		}
 
@@ -846,10 +859,10 @@
 		armPopupHistory();
 		hasShell = $stage.find('[data-zcf-checkout-flow]').length > 0;
 
-		if (!hasShell) {
+		if (!hasShell || isTopup) {
 			$stage.html('<div class="zcf-popup-loading" data-zcf-popup-loading>' + zcfCheckout.i18n.loading + '</div>');
 			stepHistory = [];
-			renderPopupShell($stage);
+			renderPopupShell($stage, false, isTopup ? 'choose_plan' : 'auto', { topup: isTopup });
 			return;
 		}
 
@@ -1008,6 +1021,7 @@
 		parkPersistentCheckoutHost();
 		getPopup().removeClass('is-active').attr('aria-hidden', 'true');
 		$('body').removeClass('zcf-popup-open');
+		topupModeActive = false;
 
 		if (shouldRedirect) {
 			window.location.href = zcfCheckout.homeUrl;
@@ -1035,7 +1049,8 @@
 				nonce: zcfCheckout.nonce,
 				product_id: $button.data('product-id') || 0,
 				variation_id: $button.data('variation-id') || 0,
-				member_recovery: $button.data('zcf-member-recovery') ? 1 : 0
+				member_recovery: $button.data('zcf-member-recovery') ? 1 : 0,
+				zcf_topup: topupModeActive ? 1 : 0
 			}
 		})
 			.done(function (response) {
@@ -1166,6 +1181,11 @@
 		addRecoveryProduct($(this));
 	});
 
+	$(document).on('click', '[data-zcf-open-topup]', function (event) {
+		event.preventDefault();
+		openPopup({ topup: true });
+	});
+
 	$(document).on('click', '[data-zcf-remove-cart-item]', function () {
 		removeCartItem($(this));
 	});
@@ -1262,7 +1282,7 @@
 		}
 
 		if (zcfCheckout.autoOpen) {
-			openPopup();
+			openPopup({ topup: zcfCheckout.autoOpenMode === 'topup' });
 		}
 	});
 

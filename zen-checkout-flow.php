@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Zen Checkout Flow
  * Description: Popup-based WooCommerce checkout/cart flow for logged-in customers.
- * Version: 0.1.74
+ * Version: 0.1.75
  * Author: Custom
  * Text Domain: zen-checkout-flow
  *
@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
 if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 	final class ZCF_Zen_Checkout_Flow {
 
-		const VERSION = '0.1.74';
+		const VERSION = '0.1.75';
 		const NONCE_ACTION = 'zcf_checkout_flow';
 		private static $native_card_bootstrap_summary = null;
 
@@ -118,6 +118,7 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 					'cartUrl'     => self::dependencies_loaded() ? wc_get_cart_url() : '',
 					'homeUrl'     => home_url( '/' ),
 					'autoOpen'    => self::should_auto_open_popup(),
+					'autoOpenMode' => self::get_auto_open_mode(),
 					'popupOwnsRoute' => self::is_popup_owned_route(),
 					'myAccountUrl' => self::dependencies_loaded() ? wc_get_page_permalink( 'myaccount' ) : '',
 					'isLoggedIn'   => is_user_logged_in(),
@@ -249,12 +250,43 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 				return false;
 			}
 
-			$has_open_flag = isset( $_GET['zcf_open_checkout'] ) && '1' === wc_clean( wp_unslash( $_GET['zcf_open_checkout'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			$open_mode     = self::get_open_checkout_mode_from_request();
+			$has_open_flag = in_array( $open_mode, array( 'checkout', 'topup' ), true );
 
 			return ( function_exists( 'is_cart' ) && is_cart() )
 				|| $has_open_flag
 				|| self::get_mixed_recovery_result_from_request()
 				|| self::get_successful_purchase_result_from_request();
+		}
+
+		/**
+		 * Get the requested auto-open mode for frontend JS.
+		 *
+		 * @return string
+		 */
+		private static function get_auto_open_mode() {
+			$open_mode = self::get_open_checkout_mode_from_request();
+
+			return $open_mode ? $open_mode : ( self::should_auto_open_popup() ? 'checkout' : '' );
+		}
+
+		/**
+		 * Read the popup open mode from the request query flag.
+		 *
+		 * @return string
+		 */
+		private static function get_open_checkout_mode_from_request() {
+			if ( empty( $_GET['zcf_open_checkout'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+				return '';
+			}
+
+			$mode = sanitize_key( wp_unslash( $_GET['zcf_open_checkout'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+
+			if ( 'topup' === $mode ) {
+				return 'topup';
+			}
+
+			return '1' === $mode ? 'checkout' : '';
 		}
 
 		/**
@@ -413,10 +445,15 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 		public static function ajax_render_checkout() {
 			self::verify_ajax( false );
 
+			if ( self::is_ajax_topup_request() && is_user_logged_in() && WC()->cart ) {
+				WC()->cart->empty_cart();
+				WC()->cart->calculate_totals();
+			}
+
 			wp_send_json_success(
 				array(
-					'html'      => self::render_shell( self::get_ajax_current_url(), self::get_ajax_step() ),
-					'step'      => self::normalize_step( self::get_ajax_step() ),
+					'html'      => self::render_shell( self::get_ajax_current_url(), self::is_ajax_topup_request() ? 'choose_plan' : self::get_ajax_step() ),
+					'step'      => self::is_ajax_topup_request() ? 'choose_plan' : self::normalize_step( self::get_ajax_step() ),
 					'cartCount' => self::get_cart_count(),
 				)
 			);
@@ -463,13 +500,20 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 				);
 			}
 
-			if ( ! WC()->cart || WC()->cart->is_empty() ) {
+			$is_topup_request = self::is_ajax_topup_request();
+
+			if ( ( ! WC()->cart || WC()->cart->is_empty() ) && ! $is_topup_request ) {
 				return self::render_empty_cart();
 			}
 
 			$context             = self::get_checkout_context();
+			if ( $is_topup_request && ( ! WC()->cart || WC()->cart->is_empty() ) ) {
+				$context['mode'] = 'topup';
+				$step            = 'choose_plan';
+			} else {
+				$step = self::resolve_frame_step( $context, $step );
+			}
 			$mode                = isset( $context['mode'] ) ? $context['mode'] : 'money_purchase';
-			$step                = self::resolve_frame_step( $context, $step );
 			$show_checkout_intro = 'payment' === $step;
 			$is_cart_step        = in_array( $step, array( 'choose_plan', 'shortage_prompt' ), true );
 			$show_back           = 'payment' === $step && ! empty( $context['has_booking_items'] ) && ( 'mixed_recovery' === $mode || ! empty( $context['has_recovery_products'] ) );
@@ -1794,7 +1838,7 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			<?php if ( self::should_render_debug() ) : ?>
 				<?php echo self::render_checkout_context_debug(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 			<?php endif; ?>
-			<?php if ( $is_cart_step && 'insufficient_prompt' === $mode ) : ?>
+			<?php if ( $is_cart_step && ( self::is_ajax_topup_request() || 'insufficient_prompt' === $mode ) ) : ?>
 				<?php echo self::render_insufficient_zencoin_prompt( $context, $step ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 				<?php
 				return ob_get_clean();
@@ -3103,6 +3147,15 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 		}
 
 		/**
+		 * Whether the current AJAX request is the wallet top-up chooser flow.
+		 *
+		 * @return bool
+		 */
+		private static function is_ajax_topup_request() {
+			return ! empty( $_POST['zcf_topup'] ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
+		}
+
+		/**
 		 * Normalize a checkout popup step.
 		 *
 		 * @param string $step Requested step.
@@ -3717,7 +3770,8 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 
 			$product_id         = isset( $_POST['product_id'] ) ? absint( wp_unslash( $_POST['product_id'] ) ) : 0; // phpcs:ignore WordPress.Security.NonceVerification.Missing
 			$variation_id       = isset( $_POST['variation_id'] ) ? absint( wp_unslash( $_POST['variation_id'] ) ) : 0; // phpcs:ignore WordPress.Security.NonceVerification.Missing
-			$is_member_recovery = ! empty( $_POST['member_recovery'] ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
+			$is_topup           = self::is_ajax_topup_request();
+			$is_member_recovery = ! $is_topup && ! empty( $_POST['member_recovery'] ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
 			$cart_item_data     = array(
 				'zcf_recovery_product' => true,
 			);
@@ -3765,7 +3819,7 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			}
 
 			foreach ( WC()->cart->get_cart() as $cart_item_key => $cart_item ) {
-				if ( ! empty( $cart_item['zcf_recovery_product'] ) ) {
+				if ( $is_topup || ! empty( $cart_item['zcf_recovery_product'] ) ) {
 					WC()->cart->remove_cart_item( $cart_item_key );
 				}
 			}
@@ -3793,7 +3847,7 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 			$context = self::get_checkout_context();
 			$mode    = isset( $context['mode'] ) ? (string) $context['mode'] : 'money_purchase';
 
-			if ( 'mixed_recovery' !== $mode ) {
+			if ( ! $is_topup && 'mixed_recovery' !== $mode ) {
 				WC()->cart->remove_cart_item( $cart_item_key );
 				WC()->cart->calculate_totals();
 
