@@ -4,6 +4,7 @@
 	var currentStep = 'auto';
 	var stepHistory = [];
 	var popupHistoryArmed = false;
+	var topupModeActive = false;
 	var authCartHandoffKey = 'zcf_auth_cart_handoff_pending';
 	var authModalObserver = null;
 	var authModalWasActive = false;
@@ -89,96 +90,6 @@
 		$stash.append($host);
 	}
 
-	function setPaymentHostFetching(isFetching) {
-		var $host = getPersistentCheckoutHost();
-
-		if (!$host.length) {
-			return;
-		}
-
-		if (isFetching) {
-			$host.addClass('is-fetching-payments');
-		} else {
-			$host.removeClass('is-fetching-payments');
-		}
-	}
-
-	function pollPaymentHostReady(attemptsLeft) {
-		attemptsLeft = typeof attemptsLeft === 'number' ? attemptsLeft : 40;
-		var $host = getPersistentCheckoutHost();
-
-		if (!$host.length) {
-			return;
-		}
-
-		var hasPaymentInputs = $host.find('input[name="radio-control-wc-payment-method-options"], input[name="payment-method"], .wc-block-components-payment-method-options, .wc-block-components-payment-method-label, .wc-block-components-payment-method-options__option').length > 0;
-
-		if (hasPaymentInputs || attemptsLeft <= 0) {
-			setPaymentHostFetching(false);
-			clearStaleCoinBalanceNotices(getPopupStage());
-			try {
-				window.dispatchEvent(new Event('resize'));
-			} catch (e) {}
-		} else {
-			window.setTimeout(function () {
-				pollPaymentHostReady(attemptsLeft - 1);
-			}, 80);
-		}
-	}
-
-	function refreshWcStoreCart() {
-		var cacheBuster = '?nocache=' + Date.now();
-
-		if (window.wp && window.wp.apiFetch) {
-			try {
-				window.wp.apiFetch({ path: '/wc/store/v1/cart' + cacheBuster })
-					.then(function (liveCart) {
-						logPaymentDebug('store:live-cart-fetched', { liveCart: liveCart });
-
-						if (window.wp && window.wp.data && typeof window.wp.data.dispatch === 'function') {
-							var cartDispatch = window.wp.data.dispatch('wc/store/cart');
-							if (cartDispatch && typeof cartDispatch.receiveCart === 'function') {
-								cartDispatch.receiveCart(liveCart);
-							} else if (cartDispatch && typeof cartDispatch.fetchCart === 'function') {
-								cartDispatch.fetchCart();
-							}
-
-							if (typeof window.wp.data.invalidateResolution === 'function') {
-								try {
-									window.wp.data.invalidateResolution('wc/store/cart', 'getCartData', []);
-								} catch (e) {}
-							}
-						}
-
-						pollPaymentHostReady(30);
-
-						window.setTimeout(function () {
-							try {
-								window.dispatchEvent(new Event('resize'));
-								$(document.body).trigger('updated_checkout');
-							} catch (e) {}
-						}, 50);
-					})
-					.catch(function (err) {
-						logPaymentDebug('store:live-cart-fetch-error', { error: err });
-						pollPaymentHostReady(5);
-					});
-			} catch (error) {
-				logPaymentDebug('refreshWcStoreCart apiFetch error', { error: error });
-				pollPaymentHostReady(5);
-			}
-		} else {
-			pollPaymentHostReady(15);
-		}
-
-		try {
-			window.dispatchEvent(new Event('resize'));
-			$(document.body).trigger('update_checkout');
-			$(document.body).trigger('updated_checkout');
-			$(document.body).trigger('wc_fragment_refresh');
-		} catch (e) {}
-	}
-
 	function attachPersistentCheckoutHost($shell) {
 		var $host = getPersistentCheckoutHost();
 		var $slot = $shell.find('[data-zcf-block-checkout-slot]').first();
@@ -189,12 +100,6 @@
 
 		$slot.empty().append($host);
 		clearStaleCoinBalanceNotices($shell);
-		setPaymentHostFetching(true);
-		refreshWcStoreCart();
-
-		window.setTimeout(function () {
-			refreshWcStoreCart();
-		}, 250);
 	}
 
 	function isDebugEnabled() {
@@ -612,13 +517,8 @@
 	function clearStaleCoinBalanceNotices($scope) {
 		var patterns = [
 			/current balance is/i,
-			/you need \d+(?:[.,]\d+)? coins for these bookings/i,
-			/cart is currently empty/i,
-			/checkout is not available whilst your cart is empty/i,
-			/no payment method available/i
+			/you need \d+(?:[.,]\d+)? coins for these bookings/i
 		];
-
-		$scope.find('.wc-block-components-empty-cart, .wc-block-checkout__empty-cart, .wp-block-woocommerce-checkout-empty-cart-block, [class*="empty-cart"]').remove();
 
 		$scope.find('.wc-block-components-notice-banner, .woocommerce-error, [role="alert"]').each(function () {
 			var $notice = $(this);
@@ -704,13 +604,15 @@
 		});
 	}
 
-	function openThemeLoginPopup() {
+	function openThemeLoginPopup(options) {
 		var checkoutReturnUrl;
 		var authModal = document.getElementById('zenctuary-auth-modal');
 
+		options = options || {};
+
 		try {
 			checkoutReturnUrl = new URL(window.location.href);
-			checkoutReturnUrl.searchParams.set('zcf_open_checkout', '1');
+			checkoutReturnUrl.searchParams.set('zcf_open_checkout', options.topup ? 'topup' : '1');
 			window.sessionStorage.setItem('zenctuary_post_auth_redirect', checkoutReturnUrl.toString());
 		} catch (error) {
 			// Ignore URL/storage issues and continue with the popup fallback.
@@ -739,8 +641,8 @@
 		return !zcfCheckout.isLoggedIn;
 	}
 
-	function openLoginFlowOrFallback() {
-		if (shouldUseThemeLogin() && openThemeLoginPopup()) {
+	function openLoginFlowOrFallback(options) {
+		if (shouldUseThemeLogin() && openThemeLoginPopup(options)) {
 			return true;
 		}
 
@@ -878,9 +780,10 @@
 		return getPopup().find('[data-zcf-popup-stage]');
 	}
 
-	function ensureCheckoutRuntimeOrRedirect(requestedStep) {
+	function ensureCheckoutRuntimeOrRedirect(options) {
 		var url;
-		var targetStep = requestedStep || '';
+
+		options = options || {};
 
 		if (zcfCheckout.checkoutRuntimeReady || getPersistentCheckoutHost().length) {
 			return true;
@@ -888,13 +791,7 @@
 
 		try {
 			url = new URL(window.location.href);
-			url.searchParams.set('zcf_open_checkout', '1');
-			if (!targetStep) {
-				targetStep = url.searchParams.get('zcf_step') || '';
-			}
-			if (targetStep && targetStep !== '1' && targetStep !== 'true') {
-				url.searchParams.set('zcf_step', targetStep);
-			}
+			url.searchParams.set('zcf_open_checkout', options.topup ? 'topup' : '1');
 			window.location.href = url.toString();
 		} catch (error) {
 			window.location.href = zcfCheckout.cartUrl || window.location.href;
@@ -903,7 +800,9 @@
 		return false;
 	}
 
-	function renderPopupShell($stage, skipResult, step) {
+	function renderPopupShell($stage, skipResult, step, options) {
+		options = options || {};
+
 		return $.ajax({
 			type: 'POST',
 			url: zcfCheckout.ajaxUrl,
@@ -911,7 +810,8 @@
 				action: 'zcf_render_checkout',
 				nonce: zcfCheckout.nonce,
 				current_url: skipResult ? '' : window.location.href,
-				zcf_step: step || 'auto'
+				zcf_step: step || 'auto',
+				zcf_topup: options.topup ? 1 : 0
 			}
 		}).done(function (response) {
 			if (response && response.success && response.data && response.data.html) {
@@ -932,29 +832,25 @@
 		});
 	}
 
-	function openPopup(requestedStep) {
+	function openPopup(options) {
 		var $popup = getPopup();
 		var $stage = getPopupStage();
 		var hasShell;
-		var stepParam = (requestedStep && requestedStep !== '1' && requestedStep !== 'true') ? requestedStep : '';
+		var isTopup;
 
-		if (!stepParam) {
-			try {
-				stepParam = new URL(window.location.href).searchParams.get('zcf_step') || (zcfCheckout && zcfCheckout.requestedStep) || '';
-			} catch (error) {
-				stepParam = (zcfCheckout && zcfCheckout.requestedStep) || '';
-			}
-		}
+		options = options || {};
+		isTopup = !!options.topup;
+		topupModeActive = isTopup;
 
 		if (!$popup.length || !$stage.length) {
 			return;
 		}
 
-		if (openLoginFlowOrFallback()) {
+		if (openLoginFlowOrFallback({ topup: isTopup })) {
 			return;
 		}
 
-		if (!ensureCheckoutRuntimeOrRedirect(stepParam)) {
+		if (!ensureCheckoutRuntimeOrRedirect({ topup: isTopup })) {
 			return;
 		}
 
@@ -963,16 +859,17 @@
 		armPopupHistory();
 		hasShell = $stage.find('[data-zcf-checkout-flow]').length > 0;
 
-		if (!hasShell || stepParam) {
+		if (!hasShell || isTopup) {
 			$stage.html('<div class="zcf-popup-loading" data-zcf-popup-loading>' + zcfCheckout.i18n.loading + '</div>');
 			stepHistory = [];
-			renderPopupShell($stage, false, stepParam || 'auto');
+			renderPopupShell($stage, false, isTopup ? 'choose_plan' : 'auto', { topup: isTopup });
 			return;
 		}
 
 		currentStep = getShellStep($stage) || currentStep;
 		syncBackButtonState($stage);
 		attachPersistentCheckoutHost($stage);
+
 	}
 
 	function reloadPopupToPayment(previousStep) {
@@ -1124,6 +1021,7 @@
 		parkPersistentCheckoutHost();
 		getPopup().removeClass('is-active').attr('aria-hidden', 'true');
 		$('body').removeClass('zcf-popup-open');
+		topupModeActive = false;
 
 		if (shouldRedirect) {
 			window.location.href = zcfCheckout.homeUrl;
@@ -1151,20 +1049,13 @@
 				nonce: zcfCheckout.nonce,
 				product_id: $button.data('product-id') || 0,
 				variation_id: $button.data('variation-id') || 0,
-				member_recovery: $button.data('zcf-member-recovery') ? 1 : 0
+				member_recovery: $button.data('zcf-member-recovery') ? 1 : 0,
+				zcf_topup: topupModeActive ? 1 : 0
 			}
 		})
 			.done(function (response) {
-				if (response && response.success && response.data) {
-					stepHistory.push(previousStep || 'choose_plan');
-					try {
-						var url = new URL(window.location.href);
-						url.searchParams.delete('zcf_step');
-						url.searchParams.set('zcf_open_checkout', '1');
-						window.history.replaceState({}, '', url.toString());
-					} catch (e) {}
-					updateFragments($shell, response.data);
-					refreshWcStoreCart();
+				if (response && response.success) {
+					reloadPopupToPayment(previousStep);
 					return;
 				}
 
@@ -1290,6 +1181,11 @@
 		addRecoveryProduct($(this));
 	});
 
+	$(document).on('click', '[data-zcf-open-topup]', function (event) {
+		event.preventDefault();
+		openPopup({ topup: true });
+	});
+
 	$(document).on('click', '[data-zcf-remove-cart-item]', function () {
 		removeCartItem($(this));
 	});
@@ -1352,47 +1248,26 @@
 			return;
 		}
 
-		var requestedStep = $(this).attr('data-zcf-open-checkout') || $(this).attr('data-zcf-step') || '';
-		if (!requestedStep) {
-			try {
-				var href = $(this).attr('href') || '';
-				requestedStep = new URL(href, window.location.href).searchParams.get('zcf_step') || '';
-			} catch (e) {}
-		}
-
-		openPopup(requestedStep || 'choose_plan');
+		openPopup();
 	});
 
 	$(document).on('click', 'a[href]', function (event) {
-		if ($(this).is('[data-zcf-open-checkout]')) {
-			return;
-		}
-
 		if (!isCartOrCheckoutUrl(this.href)) {
 			return;
 		}
 
 		event.preventDefault();
-
-		var requestedStep = $(this).attr('data-zcf-open-checkout') || $(this).attr('data-zcf-step') || '';
-		if (!requestedStep) {
-			try {
-				requestedStep = new URL(this.href, window.location.href).searchParams.get('zcf_step') || '';
-			} catch (e) {}
-		}
-
-		openPopup(requestedStep);
+		openPopup();
 	});
 
-	$(document.body).on('added_to_cart', function (event, fragments, cartHash, $button) {
-		if ($button && $button.length && $button.closest('[data-zcf-checkout-flow]').length) {
-			return;
-		}
-
+	$(document.body).on('added_to_cart', function () {
 		var $stage = getPopupStage();
-		var $shell = $stage.find('[data-zcf-checkout-flow]').first();
+		var $shell;
 
-		if (getPopup().hasClass('is-active') && $shell.length) {
+		openPopup();
+		$shell = $stage.find('[data-zcf-checkout-flow]').first();
+
+		if ($shell.length) {
 			request($shell, 'zcf_refresh_checkout');
 		}
 	});
@@ -1407,7 +1282,7 @@
 		}
 
 		if (zcfCheckout.autoOpen) {
-			openPopup(zcfCheckout.requestedStep || '');
+			openPopup({ topup: zcfCheckout.autoOpenMode === 'topup' });
 		}
 	});
 
