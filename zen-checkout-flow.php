@@ -558,7 +558,6 @@ if ( ! class_exists( 'ZCF_Zen_Checkout_Flow' ) ) {
 						<section class="zcf-right">
 							<?php if ( $show_checkout_intro ) : ?>
 								<h2><?php echo esc_html( $title ); ?></h2>
-								<p class="zcf-muted"><?php esc_html_e( 'A confirmation of your purchase will be sent to you by email.', 'zen-checkout-flow' ); ?></p>
 							<?php endif; ?>
 
 							<div class="zcf-payment-panel" data-zcf-payment-panel>
